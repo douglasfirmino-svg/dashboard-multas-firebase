@@ -114,6 +114,60 @@ function atualizarDashboard() {
   atualizarTabelaOverview();
   atualizarTabelaDetalhes();
   atualizarGraficos();
+  atualizarCityCards();
+  atualizarStatusCards();
+}
+
+function atualizarCityCards() {
+  const container = document.getElementById('cityCardi');
+  if (!container) return;
+
+  if (multasFiltradas.length === 0) {
+    container.innerHTML = `<div class="loading">📭 Nenhuma multa registrada</div>`;
+    return;
+  }
+
+  const porCidade = {};
+  multasFiltradas.forEach(m => {
+    const cidade = m['Centro de custo'] || 'Não informado';
+    if (!porCidade[cidade]) porCidade[cidade] = { total: 0, valor: 0 };
+    porCidade[cidade].total += 1;
+    porCidade[cidade].valor += Number(m['Valor']) || 0;
+  });
+
+  container.innerHTML = Object.entries(porCidade).map(([cidade, dados]) => `
+    <div class="city-card">
+      <h3>${cidade}</h3>
+      <p>${dados.total} multa${dados.total !== 1 ? 's' : ''}</p>
+      <p>R$ ${dados.valor.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</p>
+    </div>
+  `).join('');
+}
+
+function atualizarStatusCards() {
+  const container = document.getElementById('statusCards');
+  if (!container) return;
+
+  if (multasFiltradas.length === 0) {
+    container.innerHTML = `<div class="loading">📭 Nenhuma multa registrada</div>`;
+    return;
+  }
+
+  const porStatus = {};
+  multasFiltradas.forEach(m => {
+    const status = m['Status'] || 'Pendente';
+    if (!porStatus[status]) porStatus[status] = { total: 0, valor: 0 };
+    porStatus[status].total += 1;
+    porStatus[status].valor += Number(m['Valor']) || 0;
+  });
+
+  container.innerHTML = Object.entries(porStatus).map(([status, dados]) => `
+    <div class="status-card">
+      <h3>${status}</h3>
+      <p>${dados.total} multa${dados.total !== 1 ? 's' : ''}</p>
+      <p>R$ ${dados.valor.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</p>
+    </div>
+  `).join('');
 }
 
 function atualizarKPIs() {
