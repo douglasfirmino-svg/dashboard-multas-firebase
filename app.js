@@ -1,5 +1,5 @@
 // ============================================
-// DASHBOARD DE MULTAS v3 - FIREBASE
+// DASHBOARD DE MULTAS v3 - FIREBASE (CORRIGIDO)
 // ============================================
 
 let dadosOriginais = [];
@@ -18,7 +18,6 @@ function inicializarDashboard() {
   
   console.log('✅ Firebase pronto! Iniciando dashboard...');
   carregarDadosFirebase();
-  setInterval(carregarDadosFirebase, 10000);
 }
 
 // ============================================
@@ -57,7 +56,11 @@ function carregarDadosFirebase() {
         dadosFiltrados = [...dadosOriginais];
         renderizarDashboard();
         
-        atualizarStatusSync('✅ Sincronizado');
+        if (dadosOriginais.length === 0) {
+          atualizarStatusSync('✅ Sem dados para exibir');
+        } else {
+          atualizarStatusSync('✅ Sincronizado');
+        }
         atualizarTimestamp();
       },
       (error) => {
@@ -152,6 +155,16 @@ function renderizarDashboard() {
 
 // --- CARDS KPI ---
 function renderizarCards() {
+  if (dadosFiltrados.length === 0) {
+    document.getElementById('kpiCards').innerHTML = `
+      <div class="loading" style="grid-column: 1/-1; padding: 60px 20px; text-align: center; color: #999;">
+        📭 Nenhuma multa registrada<br>
+        <small>Importe dados via Firebase para começar</small>
+      </div>
+    `;
+    return;
+  }
+  
   const total = dadosFiltrados.length;
   const pendentes = dadosFiltrados.filter(m => m.status === 'Pendente').length;
   const pagos = dadosFiltrados.filter(m => m.status === 'Pago').length;
@@ -201,7 +214,15 @@ function renderizarCards() {
 
 // --- GRÁFICOS ---
 function renderizarGraficos() {
-  if (dadosFiltrados.length === 0) return;
+  if (dadosFiltrados.length === 0) {
+    ['graficoStatus', 'graficoValor', 'graficoCidade', 'graficoTendencia', 'graficoTipo'].forEach(id => {
+      const elem = document.getElementById(id);
+      if (elem && elem.parentElement) {
+        elem.parentElement.innerHTML = '<div style="text-align: center; color: #999; padding: 40px;">📭 Sem dados para gráfico</div>';
+      }
+    });
+    return;
+  }
   
   // Gráfico 1: Status
   const statusData = {
@@ -364,7 +385,7 @@ function renderizarTabelaPrincipal() {
   document.getElementById('totalRegistros').textContent = `${dadosFiltrados.length} registro${dadosFiltrados.length !== 1 ? 's' : ''}`;
   
   if (dadosFiltrados.length === 0) {
-    tbody.innerHTML = '<tr><td colspan="8" style="text-align: center; padding: 40px;">Nenhuma multa encontrada</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="8" style="text-align: center; padding: 40px;">📭 Nenhuma multa encontrada</td></tr>';
     return;
   }
   
@@ -389,7 +410,7 @@ function renderizarTabelas() {
   const tbody = document.getElementById('tabelaDetalhes');
   
   if (dadosFiltrados.length === 0) {
-    tbody.innerHTML = '<tr><td colspan="10" style="text-align: center; padding: 40px;">Nenhuma multa encontrada</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="10" style="text-align: center; padding: 40px;">📭 Nenhuma multa encontrada</td></tr>';
     return;
   }
   
@@ -413,6 +434,11 @@ function renderizarTabelas() {
 }
 
 function renderizarPorCidade() {
+  if (dadosFiltrados.length === 0) {
+    document.getElementById('cityCardi').innerHTML = '<div class="loading" style="grid-column: 1/-1;">📭 Sem dados para exibir</div>';
+    return;
+  }
+  
   const cidadeData = {};
   dadosFiltrados.forEach(m => {
     if (!cidadeData[m.cidade]) {
@@ -432,10 +458,15 @@ function renderizarPorCidade() {
       </div>
     `).join('');
   
-  document.getElementById('cityCardi').innerHTML = html || '<div class="loading">Sem dados</div>';
+  document.getElementById('cityCardi').innerHTML = html;
 }
 
 function renderizarPorStatus() {
+  if (dadosFiltrados.length === 0) {
+    document.getElementById('statusCards').innerHTML = '<div class="loading" style="grid-column: 1/-1;">📭 Sem dados para exibir</div>';
+    return;
+  }
+  
   const statusData = {
     'Pendente': { count: 0, valor: 0 },
     'Pago': { count: 0, valor: 0 },
@@ -530,6 +561,11 @@ function mostrarErro(error) {
 }
 
 function exportarRelatorio() {
+  if (dadosFiltrados.length === 0) {
+    alert('📭 Nenhuma multa para exportar!');
+    return;
+  }
+  
   let csv = 'ID,Data,Placa,Motorista,Local,Cidade,Tipo,Valor,Status,AIT\n';
   
   dadosFiltrados.forEach(m => {
@@ -545,11 +581,6 @@ function exportarRelatorio() {
   document.body.removeChild(element);
   
   console.log('📥 Relatório exportado');
-}
-
-function log(msg) {
-  const time = new Date().toLocaleTimeString('pt-BR');
-  console.log(`[${time}] ${msg}`);
 }
 
 // ============================================
