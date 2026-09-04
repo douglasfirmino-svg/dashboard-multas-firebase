@@ -8,26 +8,27 @@ let graficos = {};
 let abaAtiva = 'overview';
 let unsubscribe = null;
 
-// ============================================
-// INICIALIZAÇÃO
-// ============================================
-document.addEventListener('DOMContentLoaded', () => {
-  log('🚀 Dashboard v3 Firebase iniciado');
-  carregarDadosFirebase();
+// Aguardar Firebase estar pronto
+function inicializarDashboard() {
+  if (typeof db === 'undefined') {
+    console.log('⏳ Aguardando Firebase...');
+    setTimeout(inicializarDashboard, 500);
+    return;
+  }
   
-  // Recarregar a cada 10 segundos
+  console.log('✅ Firebase pronto! Iniciando dashboard...');
+  carregarDadosFirebase();
   setInterval(carregarDadosFirebase, 10000);
-});
+}
 
 // ============================================
 // CARREGAR DADOS DO FIREBASE
 // ============================================
 function carregarDadosFirebase() {
   try {
-    log('🔄 Carregando do Firebase...');
+    console.log('🔄 Carregando do Firebase...');
     atualizarStatusSync('🔄 Sincronizando...');
     
-    // Listener em tempo real
     if (unsubscribe) unsubscribe();
     
     unsubscribe = db.collection('multas').onSnapshot(
@@ -38,19 +39,19 @@ function carregarDadosFirebase() {
           const data = doc.data();
           dadosOriginais.push({
             id: doc.id,
-            data: data.data || '',
-            placa: (data.placa || '').toUpperCase(),
-            motorista: data.motorista || 'PENDENTE',
-            local: data.local || '',
-            cidade: data.cidade || extrairCidade(data.local || ''),
-            tipo: data.tipo || '',
-            valor: parseFloat(data.valor) || 0,
+            data: data.data || data['Data infração'] || '',
+            placa: (data.placa || data.Placa || '').toUpperCase(),
+            motorista: data.motorista || data.Condutor || 'PENDENTE',
+            local: data.local || data['Centro de custo'] || '',
+            cidade: data.cidade || extrairCidade(data.local || data['Centro de custo'] || ''),
+            tipo: data.tipo || data['Descrição infração'] || '',
+            valor: parseFloat(data.valor || data.Valor || 0) || 0,
             status: data.status || 'Pendente',
-            ait: data.ait || ''
+            ait: data.ait || data.Ait || ''
           });
         });
         
-        log(`✅ ${dadosOriginais.length} multas carregadas do Firebase`);
+        console.log(`✅ ${dadosOriginais.length} multas carregadas`);
         
         preencherFiltrosDinamicos();
         dadosFiltrados = [...dadosOriginais];
@@ -60,14 +61,14 @@ function carregarDadosFirebase() {
         atualizarTimestamp();
       },
       (error) => {
-        log('❌ Erro Firebase: ' + error.message);
+        console.error('❌ Erro Firebase:', error);
         atualizarStatusSync('❌ Erro ao carregar');
         mostrarErro(error);
       }
     );
     
   } catch (error) {
-    log('❌ Erro: ' + error.message);
+    console.error('❌ Erro:', error);
     atualizarStatusSync('❌ Erro de conexão');
     mostrarErro(error);
   }
@@ -523,7 +524,7 @@ function mostrarErro(error) {
   document.getElementById('kpiCards').innerHTML = `
     <div class="loading" style="color: red; grid-column: 1/-1;">
       ❌ Erro ao carregar Firebase<br>
-      <small>${error.message}</small>
+      <small>${error.message || 'Verifique a configuração'}</small>
     </div>
   `;
 }
@@ -543,10 +544,15 @@ function exportarRelatorio() {
   element.click();
   document.body.removeChild(element);
   
-  log('📥 Relatório exportado');
+  console.log('📥 Relatório exportado');
 }
 
 function log(msg) {
   const time = new Date().toLocaleTimeString('pt-BR');
   console.log(`[${time}] ${msg}`);
 }
+
+// ============================================
+// INICIAR DASHBOARD
+// ============================================
+inicializarDashboard();
