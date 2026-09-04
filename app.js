@@ -11,6 +11,13 @@ if (typeof Chart !== 'undefined' && typeof ChartDataLabels !== 'undefined') {
 let todasMultas = [];
 let multasFiltradas = [];
 
+// ============================================
+// CONFIGURAÇÃO CLOUDINARY (upload de termos assinados)
+// ============================================
+const CLOUDINARY_CLOUD_NAME = 'uv7nwlbc';
+const CLOUDINARY_UPLOAD_PRESET = 'xmo2bznb';
+let urlTermoAtual = null; // guarda a URL do termo já anexado ao editar uma multa
+
 // Espera o Firebase estar pronto (window.db é setado pelo firebase-config.js)
 function aguardarFirebase() {
   return new Promise((resolve) => {
@@ -218,7 +225,7 @@ function atualizarTabelaOverview() {
 function atualizarTabelaDetalhes() {
   const corpo = document.getElementById('tabelaDetalhes');
   if (multasFiltradas.length === 0) {
-    corpo.innerHTML = `<tr><td colspan="10" style="text-align:center; padding:30px;">📭 Nenhuma multa registrada</td></tr>`;
+    corpo.innerHTML = `<tr><td colspan="15" style="text-align:center; padding:30px;">📭 Nenhuma multa registrada</td></tr>`;
     return;
   }
 
@@ -238,6 +245,7 @@ function atualizarTabelaDetalhes() {
       <td>${m['Ait'] || '-'}</td>
       <td>${m['Desconto Colaborador'] ? '✅ Sim' : '❌ Não'}</td>
       <td>${m['Indicação'] ? '✅ Sim' : '❌ Não'}</td>
+      <td>${m['Termo URL'] ? `<a href="${m['Termo URL']}" target="_blank" class="btn-ver-termo">📎 Ver</a>` : '<span class="sem-termo">-</span>'}</td>
     </tr>
   `).join('');
 }
@@ -492,6 +500,13 @@ function preencherFormulario(dados, ait) {
     document.getElementById('f_data').value = `${ano}-${mes}-${dia}`;
   }
 
+  // Mostra o termo já anexado, se existir
+  urlTermoAtual = dados['Termo URL'] || null;
+  const termoAtualEl = document.getElementById('termoAtual');
+  termoAtualEl.innerHTML = urlTermoAtual
+    ? `📎 Termo já anexado: <a href="${urlTermoAtual}" target="_blank">ver arquivo atual</a> (envie um novo arquivo acima para substituir)`
+    : '';
+
   // AIT não pode ser editado depois de encontrado (é a chave do documento)
   document.getElementById('f_ait').disabled = true;
 }
@@ -532,7 +547,32 @@ function limparFormulario() {
   document.getElementById('f_ait').disabled = false;
   document.getElementById('buscarAit').value = '';
   document.getElementById('buscaMensagem').textContent = '';
+  document.getElementById('termoAtual').innerHTML = '';
+  document.getElementById('uploadProgresso').textContent = '';
+  urlTermoAtual = null;
   aitEmEdicao = null;
+}
+
+async function uploadTermoCloudinary(arquivo) {
+  const progressoEl = document.getElementById('uploadProgresso');
+  progressoEl.textContent = '📤 Enviando termo...';
+
+  const formData = new FormData();
+  formData.append('file', arquivo);
+  formData.append('upload_preset', CLOUDINARY_UPLOAD_PRESET);
+
+  // PDFs e arquivos genéricos usam resource_type "raw" para evitar bloqueio de segurança;
+  // imagens usam "image" para otimização automática do Cloudinary.
+  const tipoRecurso = arquivo.type === 'application/pdf' ? 'raw' : 'image';
+  const url = `https://api.cloudinary.com/v1_1/${CLOUDINARY_CLOUD_NAME}/${tipoRecurso}/upload`;
+
+  const resposta = await fetch(url, { method: 'POST', body: formData });
+  if (!resposta.ok) {
+    throw new Error('Falha no upload para o Cloudinary');
+  }
+  const dados = await resposta.json();
+  progressoEl.textContent = '✅ Termo enviado!';
+  return dados.secure_url;
 }
 
 
@@ -579,6 +619,15 @@ async function salvarNovaMulta(evento) {
   try {
     botao.disabled = true;
     botao.textContent = '💾 Salvando...';
+
+    // Se um novo arquivo de termo foi selecionado, faz o upload primeiro
+    const arquivoTermo = document.getElementById('f_termo').files[0];
+    if (arquivoTermo) {
+      dadosMulta['Termo URL'] = await uploadTermoCloudinary(arquivoTermo);
+    } else if (urlTermoAtual) {
+      // Mantém o termo já existente se nenhum novo arquivo foi selecionado
+      dadosMulta['Termo URL'] = urlTermoAtual;
+    }
 
     const db = await aguardarFirebase();
     await setDoc(doc(db, 'multas', ait), dadosMulta);
