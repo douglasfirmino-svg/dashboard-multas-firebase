@@ -275,7 +275,7 @@ const CORES_STATUS = {
   'Cancelado': '#0f2942'
 };
 
-function criarGraficoBarra(canvasId, dados, chartRefName) {
+function criarGraficoBarra(canvasId, dados, chartRefName, horizontal = false) {
   const ctx = document.getElementById(canvasId);
   if (!ctx) return null;
   if (window[chartRefName] && typeof window[chartRefName].destroy === 'function') {
@@ -292,9 +292,12 @@ function criarGraficoBarra(canvasId, dados, chartRefName) {
       }]
     },
     options: {
+      indexAxis: horizontal ? 'y' : 'x',
       responsive: true,
       plugins: { legend: { display: false } },
-      scales: { y: { beginAtZero: true, ticks: { precision: 0 } } }
+      scales: horizontal
+        ? { x: { beginAtZero: true, ticks: { precision: 0 } } }
+        : { y: { beginAtZero: true, ticks: { precision: 0 } } }
     }
   });
   return window[chartRefName];
@@ -305,11 +308,11 @@ function atualizarGraficoStatus() {
 }
 
 function atualizarGraficoCidade() {
-  criarGraficoBarra('graficoCidade', contarPor('Centro de custo'), 'graficoCidadeChart');
+  criarGraficoBarra('graficoCidade', contarPor('Centro de custo'), 'graficoCidadeChart', true);
 }
 
 function atualizarGraficoTipo() {
-  criarGraficoBarra('graficoTipo', contarPor('Descrição infração'), 'graficoTipoChart');
+  criarGraficoBarra('graficoTipo', contarPor('Descrição infração'), 'graficoTipoChart', true);
 }
 
 function atualizarGraficoValor() {
