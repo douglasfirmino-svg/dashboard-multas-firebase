@@ -1,5 +1,5 @@
 // ============================================
-// APP.JS - Lógica do Dashboard de Multas
+// APP.JS - Lógica do Dashboard de Multas SENATRAN
 // ============================================
 import { collection, onSnapshot } from "https://www.gstatic.com/firebasejs/10.7.0/firebase-firestore.js";
 
@@ -215,7 +215,9 @@ function contarPor(campo) {
 function criarGraficoPizza(canvasId, dados, chartRefName) {
   const ctx = document.getElementById(canvasId);
   if (!ctx) return null;
-  if (window[chartRefName]) window[chartRefName].destroy();
+  if (window[chartRefName] && typeof window[chartRefName].destroy === 'function') {
+    window[chartRefName].destroy();
+  }
 
   window[chartRefName] = new Chart(ctx, {
     type: 'doughnut',
@@ -232,15 +234,15 @@ function criarGraficoPizza(canvasId, dados, chartRefName) {
 }
 
 function atualizarGraficoStatus() {
-  criarGraficoPizza('graficoStatus', contarPor('Status'), 'graficoStatus');
+  criarGraficoPizza('graficoStatus', contarPor('Status'), 'graficoStatusChart');
 }
 
 function atualizarGraficoCidade() {
-  criarGraficoPizza('graficoCidade', contarPor('Centro de custo'), 'graficoCidade');
+  criarGraficoPizza('graficoCidade', contarPor('Centro de custo'), 'graficoCidadeChart');
 }
 
 function atualizarGraficoTipo() {
-  criarGraficoPizza('graficoTipo', contarPor('Descrição infração'), 'graficoTipo');
+  criarGraficoPizza('graficoTipo', contarPor('Descrição infração'), 'graficoTipoChart');
 }
 
 function atualizarGraficoValor() {
