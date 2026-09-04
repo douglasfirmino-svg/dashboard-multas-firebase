@@ -3,6 +3,11 @@
 // ============================================
 import { collection, onSnapshot, doc, setDoc, getDoc } from "https://www.gstatic.com/firebasejs/10.7.0/firebase-firestore.js";
 
+// Registra o plugin de data labels (mostra os valores acima/ao lado das barras)
+if (typeof Chart !== 'undefined' && typeof ChartDataLabels !== 'undefined') {
+  Chart.register(ChartDataLabels);
+}
+
 let todasMultas = [];
 let multasFiltradas = [];
 
@@ -294,7 +299,16 @@ function criarGraficoBarra(canvasId, dados, chartRefName, horizontal = false) {
     options: {
       indexAxis: horizontal ? 'y' : 'x',
       responsive: true,
-      plugins: { legend: { display: false } },
+      plugins: {
+        legend: { display: false },
+        datalabels: {
+          anchor: horizontal ? 'end' : 'end',
+          align: horizontal ? 'end' : 'top',
+          color: '#1e3a5f',
+          font: { weight: 'bold' },
+          formatter: (valor) => valor
+        }
+      },
       scales: horizontal
         ? { x: { beginAtZero: true, ticks: { precision: 0 } } }
         : { y: { beginAtZero: true, ticks: { precision: 0 } } }
@@ -332,7 +346,19 @@ function atualizarGraficoValor() {
       labels: Object.keys(porTipo),
       datasets: [{ label: 'Valor (R$)', data: Object.values(porTipo), backgroundColor: '#1e3a5f' }]
     },
-    options: { responsive: true, plugins: { legend: { display: false } } }
+    options: {
+      responsive: true,
+      plugins: {
+        legend: { display: false },
+        datalabels: {
+          anchor: 'end',
+          align: 'top',
+          color: '#1e3a5f',
+          font: { weight: 'bold' },
+          formatter: (valor) => `R$ ${valor.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`
+        }
+      }
+    }
   });
 }
 
@@ -378,7 +404,14 @@ function atualizarGraficoTendencia() {
     data: { labels: meses, datasets },
     options: {
       responsive: true,
-      plugins: { legend: { position: 'bottom' } },
+      plugins: {
+        legend: { position: 'bottom' },
+        datalabels: {
+          color: '#ffffff',
+          font: { weight: 'bold' },
+          formatter: (valor) => valor > 0 ? valor : ''
+        }
+      },
       scales: {
         x: { stacked: true },
         y: { stacked: true, beginAtZero: true, ticks: { precision: 0 } }
