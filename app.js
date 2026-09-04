@@ -14,9 +14,28 @@ let multasFiltradas = [];
 // ============================================
 // CONFIGURAÇÃO CLOUDINARY (upload de termos assinados)
 // ============================================
-const CLOUDINARY_CLOUD_NAME = 'uv7nwlbc';
-const CLOUDINARY_UPLOAD_PRESET = 'xmo2bznb';
-let urlTermoAtual = null; // guarda a URL do termo já anexado ao editar uma multa
+// Config é lido de window.cloudinaryConfig (setado por firebase-config.js)
+let CLOUDINARY_CLOUD_NAME = '';
+let CLOUDINARY_UPLOAD_PRESET = '';
+
+function aguardarCloudinaryConfig() {
+  return new Promise((resolve) => {
+    const checar = () => {
+      if (window.cloudinaryConfig) {
+        CLOUDINARY_CLOUD_NAME = window.cloudinaryConfig.cloudName;
+        CLOUDINARY_UPLOAD_PRESET = window.cloudinaryConfig.uploadPreset;
+        console.log('✅ Cloudinary config carregado');
+        resolve();
+      } else {
+        console.log('⏳ Aguardando Cloudinary config...');
+        setTimeout(checar, 200);
+      }
+    };
+    checar();
+  });
+}
+
+let urlTermoAtual = null;
 
 // Espera o Firebase estar pronto (window.db é setado pelo firebase-config.js)
 function aguardarFirebase() {
@@ -40,7 +59,6 @@ async function carregarMultas() {
   const db = await aguardarFirebase();
   const multasRef = collection(db, "multas");
 
-  // onSnapshot escuta mudanças em tempo real
   onSnapshot(multasRef, (snapshot) => {
     todasMultas = [];
     snapshot.forEach((doc) => {
@@ -80,11 +98,13 @@ function filtrarDados() {
   const status = document.getElementById('status').value;
   const placa = document.getElementById('placa').value.trim().toUpperCase();
   const cidade = document.getElementById('cidade').value;
+  const tipoVeiculo = document.getElementById('tipoVeiculo')?.value;
 
   multasFiltradas = todasMultas.filter(m => {
     if (placa && !(m['Placa'] || '').toUpperCase().includes(placa)) return false;
     if (cidade && m['Centro de custo'] !== cidade) return false;
     if (status && m['Status'] !== status) return false;
+    if (tipoVeiculo && m['Tipo de Veículo'] !== tipoVeiculo) return false;
     if (periodo) {
       const dataStr = m['Data infração'];
       if (!dataStr) return false;
@@ -112,6 +132,7 @@ function limparFiltros() {
   document.getElementById('status').value = '';
   document.getElementById('placa').value = '';
   document.getElementById('cidade').value = '';
+  document.getElementById('tipoVeiculo').value = '';
   filtrarDados();
 }
 
@@ -132,7 +153,7 @@ function atualizarTabelaCentroCusto() {
   if (!corpo) return;
 
   if (multasFiltradas.length === 0) {
-    corpo.innerHTML = `<tr><td colspan="6" style="text-align:center; padding:30px;">📭 Nenhuma multa registrada</td></tr>`;
+    corpo.innerHTML = `<tr><td colspan="8" style="text-align:center; padding:30px;">📭 Nenhuma multa registrada</td></tr>`;
     return;
   }
 
@@ -142,6 +163,8 @@ function atualizarTabelaCentroCusto() {
       <td>${m['Centro de custo'] || '-'}</td>
       <td>${m['Condutor'] || '-'}</td>
       <td>R$ ${(Number(m['Valor']) || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</td>
+      <td>${m['Tipo de Veículo'] || '-'}</td>
+      <td>${m['Locadora'] || '-'}</td>
       <td>${m['Desconto Colaborador'] ? '✅ Sim' : '❌ Não'}</td>
       <td>${m['Indicação'] ? '✅ Sim' : '❌ Não'}</td>
     </tr>
@@ -225,7 +248,7 @@ function atualizarTabelaOverview() {
 function atualizarTabelaDetalhes() {
   const corpo = document.getElementById('tabelaDetalhes');
   if (multasFiltradas.length === 0) {
-    corpo.innerHTML = `<tr><td colspan="15" style="text-align:center; padding:30px;">📭 Nenhuma multa registrada</td></tr>`;
+    corpo.innerHTML = `<tr><td colspan="17" style="text-align:center; padding:30px;">📭 Nenhuma multa registrada</td></tr>`;
     return;
   }
 
@@ -240,6 +263,8 @@ function atualizarTabelaDetalhes() {
       <td>${m['Cidade'] || '-'}</td>
       <td>${m['Centro de custo'] || '-'}</td>
       <td>${m['Matrícula'] || '-'}</td>
+      <td>${m['Tipo de Veículo'] || '-'}</td>
+      <td>${m['Locadora'] || '-'}</td>
       <td>R$ ${(Number(m['Valor']) || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</td>
       <td>${m['Status'] || 'Pendente'}</td>
       <td>${m['Ait'] || '-'}</td>
@@ -268,6 +293,7 @@ function atualizarGraficos() {
   atualizarGraficoCidade();
   atualizarGraficoTendencia();
   atualizarGraficoTipo();
+  atualizarGraficoVeiculoComparativo();
 }
 
 function contarPor(campo) {
@@ -288,6 +314,11 @@ const CORES_STATUS = {
   'Cancelado': '#0f2942'
 };
 
+const CORES_VEICULO = {
+  'Próprio': '#2d6a4f',
+  'Locado': '#1e3a5f'
+};
+
 function criarGraficoBarra(canvasId, dados, chartRefName, horizontal = false, alturaFixa = false) {
   const ctx = document.getElementById(canvasId);
   if (!ctx) return null;
@@ -300,103 +331,86 @@ function criarGraficoBarra(canvasId, dados, chartRefName, horizontal = false, al
     data: {
       labels: Object.keys(dados),
       datasets: [{
+        label: 'Quantidade',
         data: Object.values(dados),
-        backgroundColor: CORES_GRAFICO
+        backgroundColor: CORES_GRAFICO,
+        borderRadius: 8,
+        borderSkipped: false
       }]
     },
     options: {
-      indexAxis: horizontal ? 'y' : 'x',
       responsive: true,
-      maintainAspectRatio: !alturaFixa,
+      maintainAspectRatio: alturaFixa ? false : true,
+      indexAxis: horizontal ? 'y' : 'x',
       plugins: {
         legend: { display: false },
         datalabels: {
-          anchor: horizontal ? 'end' : 'end',
-          align: horizontal ? 'end' : 'top',
-          color: '#1e3a5f',
+          color: '#ffffff',
           font: { weight: 'bold' },
           formatter: (valor) => valor
         }
       },
-      scales: horizontal
-        ? { x: { beginAtZero: true, ticks: { precision: 0 } } }
-        : { y: { beginAtZero: true, ticks: { precision: 0 } } }
+      scales: {
+        x: { beginAtZero: true, ticks: { precision: 0 } },
+        y: { beginAtZero: true, ticks: { precision: 0 } }
+      }
     }
   });
   return window[chartRefName];
 }
 
 function atualizarGraficoStatus() {
-  criarGraficoBarra('graficoStatus', contarPor('Status'), 'graficoStatusChart');
-}
-
-function atualizarGraficoCidade() {
-  criarGraficoBarra('graficoCidade', contarPor('Centro de custo'), 'graficoCidadeChart', true);
-}
-
-function atualizarGraficoTipo() {
-  criarGraficoBarra('graficoTipo', contarPor('Descrição infração'), 'graficoTipoChart', true, true);
+  const dados = {};
+  multasFiltradas.forEach(m => {
+    const status = m['Status'] || 'Pendente';
+    dados[status] = (dados[status] || 0) + 1;
+  });
+  criarGraficoBarra('graficoStatus', dados, 'graficoStatusChart');
 }
 
 function atualizarGraficoValor() {
-  const porTipo = {};
+  const dados = {};
   multasFiltradas.forEach(m => {
-    const tipo = m['Descrição infração'] || 'Não informado';
-    porTipo[tipo] = (porTipo[tipo] || 0) + (Number(m['Valor']) || 0);
+    const tipo = m['Descrição infração'] || 'Sem tipo';
+    dados[tipo] = (dados[tipo] || 0) + (Number(m['Valor']) || 0);
   });
+  const top5 = Object.entries(dados)
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, 5)
+    .reduce((acc, [k, v]) => ({ ...acc, [k]: v }), {});
+  criarGraficoBarra('graficoValor', top5, 'graficoValorChart', true, true);
+  const canvas = document.getElementById('graficoValor');
+  if (canvas) canvas.parentElement.style.height = '320px';
+}
 
-  const ctx = document.getElementById('graficoValor');
-  if (!ctx) return;
-  if (window.graficoValorChart) window.graficoValorChart.destroy();
-
-  window.graficoValorChart = new Chart(ctx, {
-    type: 'bar',
-    data: {
-      labels: Object.keys(porTipo),
-      datasets: [{ label: 'Valor (R$)', data: Object.values(porTipo), backgroundColor: '#1e3a5f' }]
-    },
-    options: {
-      indexAxis: 'y',
-      responsive: true,
-      plugins: {
-        legend: { display: false },
-        datalabels: {
-          anchor: 'end',
-          align: 'end',
-          color: '#1e3a5f',
-          font: { weight: 'bold' },
-          formatter: (valor) => `R$ ${valor.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`
-        }
-      },
-      scales: {
-        x: { beginAtZero: true }
-      }
-    }
-  });
+function atualizarGraficoCidade() {
+  const dados = contarPor('Centro de custo');
+  const top5 = Object.entries(dados)
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, 5)
+    .reduce((acc, [k, v]) => ({ ...acc, [k]: v }), {});
+  criarGraficoBarra('graficoCidade', top5, 'graficoCidadeChart', true, true);
+  const canvas = document.getElementById('graficoCidade');
+  if (canvas) canvas.parentElement.style.height = '320px';
 }
 
 function atualizarGraficoTendencia() {
-  // Agrupa por mês E por status, para montar barras empilhadas
-  const meses = [];
-  const statusUnicos = new Set();
   const porMesStatus = {};
+  const statusUnicos = new Set();
 
   multasFiltradas.forEach(m => {
     const dataStr = m['Data infração'];
     if (!dataStr) return;
-    const [, mes, ano] = dataStr.split('/');
-    const chaveMes = `${mes}/${ano}`;
+    const [dia, mes, ano] = dataStr.split('/');
+    const chave = `${mes}/${ano}`;
     const status = m['Status'] || 'Pendente';
 
-    if (!meses.includes(chaveMes)) meses.push(chaveMes);
+    if (!porMesStatus[chave]) porMesStatus[chave] = {};
+    porMesStatus[chave][status] = (porMesStatus[chave][status] || 0) + 1;
     statusUnicos.add(status);
-
-    if (!porMesStatus[chaveMes]) porMesStatus[chaveMes] = {};
-    porMesStatus[chaveMes][status] = (porMesStatus[chaveMes][status] || 0) + 1;
   });
 
-  // Ordena os meses cronologicamente (MM/AAAA)
-  meses.sort((a, b) => {
+  const meses = Object.keys(porMesStatus).sort((a, b) => {
     const [ma, aa] = a.split('/').map(Number);
     const [mb, ab] = b.split('/').map(Number);
     return aa !== ab ? aa - ab : ma - mb;
@@ -434,6 +448,60 @@ function atualizarGraficoTendencia() {
   });
 }
 
+function atualizarGraficoTipo() {
+  const dados = contarPor('Descrição infração');
+  const top5 = Object.entries(dados)
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, 5)
+    .reduce((acc, [k, v]) => ({ ...acc, [k]: v }), {});
+  criarGraficoBarra('graficoTipo', top5, 'graficoTipoChart', true, true);
+  const canvas = document.getElementById('graficoTipo');
+  if (canvas) canvas.parentElement.style.height = '320px';
+}
+
+function atualizarGraficoVeiculoComparativo() {
+  const dadosVeiculo = {};
+  multasFiltradas.forEach(m => {
+    const tipo = m['Tipo de Veículo'] || 'Não informado';
+    if (!dadosVeiculo[tipo]) dadosVeiculo[tipo] = { total: 0, valor: 0 };
+    dadosVeiculo[tipo].total += 1;
+    dadosVeiculo[tipo].valor += Number(m['Valor']) || 0;
+  });
+
+  const ctx = document.getElementById('graficoVeiculo');
+  if (!ctx) return;
+  if (window.graficoVeiculoChart) window.graficoVeiculoChart.destroy();
+
+  const tipos = Object.keys(dadosVeiculo);
+  const cores = tipos.map(tipo => CORES_VEICULO[tipo] || '#94A3B8');
+
+  window.graficoVeiculoChart = new Chart(ctx, {
+    type: 'doughnut',
+    data: {
+      labels: tipos.map(t => `${t} (${dadosVeiculo[t].total})`),
+      datasets: [{
+        data: tipos.map(t => dadosVeiculo[t].total),
+        backgroundColor: cores,
+        borderRadius: 8
+      }]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: {
+        legend: { position: 'bottom' },
+        datalabels: {
+          color: '#ffffff',
+          font: { weight: 'bold' },
+          formatter: (valor) => valor
+        }
+      }
+    }
+  });
+  const canvas = document.getElementById('graficoVeiculo');
+  if (canvas) canvas.parentElement.style.height = '300px';
+}
+
 // ============================================
 // ABAS
 // ============================================
@@ -455,7 +523,7 @@ function exportarRelatorio() {
     return;
   }
 
-  const cabecalho = ['Ait', 'Placa', 'Centro de custo', 'Data infração', 'Codigo infração', 'Descrição infração', 'Valor', 'Condutor', 'Matrícula', 'Status'];
+  const cabecalho = ['Ait', 'Placa', 'Centro de custo', 'Data infração', 'Codigo infração', 'Descrição infração', 'Valor', 'Condutor', 'Matrícula', 'Tipo de Veículo', 'Locadora', 'Status'];
   const linhas = multasFiltradas.map(m => cabecalho.map(campo => `"${m[campo] || ''}"`).join(','));
   const csv = [cabecalho.join(','), ...linhas].join('\n');
 
@@ -478,11 +546,12 @@ window.exportarRelatorio = exportarRelatorio;
 window.buscarMultaPorAit = buscarMultaPorAit;
 window.limparFormulario = limparFormulario;
 window.removerTermo = removerTermo;
+window.atualizarLocadora = atualizarLocadora;
 
 // ============================================
 // FORMULÁRIO - BUSCAR MULTA EXISTENTE (para editar)
 // ============================================
-let aitEmEdicao = null; // guarda se estamos editando uma multa existente
+let aitEmEdicao = null;
 
 function preencherFormulario(dados, ait) {
   document.getElementById('f_ait').value = ait;
@@ -495,18 +564,18 @@ function preencherFormulario(dados, ait) {
   document.getElementById('f_centro').value = dados['Centro de custo'] || '';
   document.getElementById('f_local').value = dados['Local'] || '';
   document.getElementById('f_cidade').value = dados['Cidade'] || '';
+  document.getElementById('f_tipoVeiculo').value = dados['Tipo de Veículo'] || 'Próprio';
+  document.getElementById('f_locadora').value = dados['Locadora'] || '';
   document.getElementById('f_status').value = dados['Status'] || 'Pendente';
   document.getElementById('f_desconto').checked = !!dados['Desconto Colaborador'];
   document.getElementById('f_indicacao').checked = !!dados['Indicação'];
 
-  // Converte data de DD/MM/AAAA para AAAA-MM-DD (formato do input date)
   const dataStr = dados['Data infração'];
   if (dataStr) {
     const [dia, mes, ano] = dataStr.split('/');
     document.getElementById('f_data').value = `${ano}-${mes}-${dia}`;
   }
 
-  // Mostra o termo já anexado, se existir
   urlTermoAtual = dados['Termo URL'] || null;
   const termoAtualEl = document.getElementById('termoAtual');
   termoAtualEl.innerHTML = urlTermoAtual
@@ -514,8 +583,22 @@ function preencherFormulario(dados, ait) {
        <button type="button" class="btn-remover-termo" onclick="removerTermo()">🗑️ Remover Termo</button>`
     : '';
 
-  // AIT não pode ser editado depois de encontrado (é a chave do documento)
   document.getElementById('f_ait').disabled = true;
+  atualizarLocadora();
+}
+
+function atualizarLocadora() {
+  const tipoVeiculo = document.getElementById('f_tipoVeiculo').value;
+  const locadoraInput = document.getElementById('f_locadora');
+
+  if (tipoVeiculo === 'Próprio') {
+    locadoraInput.disabled = true;
+    locadoraInput.value = '';
+    locadoraInput.placeholder = '(desabilitado para veículo próprio)';
+  } else {
+    locadoraInput.disabled = false;
+    locadoraInput.placeholder = 'Nome da locadora';
+  }
 }
 
 async function removerTermo() {
@@ -582,8 +665,10 @@ function limparFormulario() {
   document.getElementById('buscaMensagem').textContent = '';
   document.getElementById('termoAtual').innerHTML = '';
   document.getElementById('uploadProgresso').textContent = '';
+  document.getElementById('f_tipoVeiculo').value = 'Próprio';
   urlTermoAtual = null;
   aitEmEdicao = null;
+  atualizarLocadora();
 }
 
 async function uploadTermoCloudinary(arquivo) {
@@ -594,31 +679,29 @@ async function uploadTermoCloudinary(arquivo) {
   formData.append('file', arquivo);
   formData.append('upload_preset', CLOUDINARY_UPLOAD_PRESET);
 
-  // Todos os arquivos (PDF ou imagem) usam resource_type "image":
-  // o Cloudinary trata PDFs como imagem (renderiza a 1ª página).
   const url = `https://api.cloudinary.com/v1_1/${CLOUDINARY_CLOUD_NAME}/image/upload`;
 
-  const resposta = await fetch(url, { method: 'POST', body: formData });
-  if (!resposta.ok) {
-    throw new Error('Falha no upload para o Cloudinary');
-  }
-  const dados = await resposta.json();
-  progressoEl.textContent = '✅ Termo enviado!';
+  try {
+    const resposta = await fetch(url, { method: 'POST', body: formData });
+    if (!resposta.ok) {
+      throw new Error('Falha no upload para o Cloudinary');
+    }
+    const dados = await resposta.json();
+    progressoEl.textContent = '✅ Termo enviado!';
 
-  // Se o arquivo original era PDF, a entrega do .pdf puro é bloqueada em contas
-  // gratuitas do Cloudinary. Construímos a URL forçando o formato .jpg da 1ª página,
-  // que contorna esse bloqueio (o Cloudinary converte automaticamente ao servir).
-  if (arquivo.type === 'application/pdf') {
-    const urlComoJpg = dados.secure_url.replace(/\.pdf$/i, '.jpg');
-    return urlComoJpg;
-  }
+    if (arquivo.type === 'application/pdf') {
+      const urlComoJpg = dados.secure_url.replace(/\.pdf$/i, '.jpg');
+      return urlComoJpg;
+    }
 
-  return dados.secure_url;
+    return dados.secure_url;
+  } catch (error) {
+    console.error('❌ Erro no upload:', error);
+    throw error;
+  }
 }
 
-
 function formatarDataBR(dataISO) {
-  // Converte "2026-08-26" (input type=date) para "26/08/2026"
   if (!dataISO) return '';
   const [ano, mes, dia] = dataISO.split('-');
   return `${dia}/${mes}/${ano}`;
@@ -640,6 +723,19 @@ async function salvarNovaMulta(evento) {
     return;
   }
 
+  const tipoVeiculo = document.getElementById('f_tipoVeiculo').value;
+  let locadora = document.getElementById('f_locadora').value.trim();
+
+  if (tipoVeiculo === 'Locado' && !locadora) {
+    mensagemEl.textContent = '❌ Informe a locadora para veículos locados.';
+    mensagemEl.className = 'form-mensagem erro';
+    return;
+  }
+
+  if (tipoVeiculo === 'Próprio') {
+    locadora = '';
+  }
+
   const dadosMulta = {
     'Ait': ait,
     'Placa': placa,
@@ -652,6 +748,8 @@ async function salvarNovaMulta(evento) {
     'Centro de custo': document.getElementById('f_centro').value.trim(),
     'Local': document.getElementById('f_local').value.trim(),
     'Cidade': document.getElementById('f_cidade').value.trim(),
+    'Tipo de Veículo': tipoVeiculo,
+    'Locadora': locadora,
     'Status': document.getElementById('f_status').value,
     'Desconto Colaborador': document.getElementById('f_desconto').checked,
     'Indicação': document.getElementById('f_indicacao').checked
@@ -661,12 +759,12 @@ async function salvarNovaMulta(evento) {
     botao.disabled = true;
     botao.textContent = '💾 Salvando...';
 
-    // Se um novo arquivo de termo foi selecionado, faz o upload primeiro
+    await aguardarCloudinaryConfig();
+
     const arquivoTermo = document.getElementById('f_termo').files[0];
     if (arquivoTermo) {
       dadosMulta['Termo URL'] = await uploadTermoCloudinary(arquivoTermo);
     } else if (urlTermoAtual) {
-      // Mantém o termo já existente se nenhum novo arquivo foi selecionado
       dadosMulta['Termo URL'] = urlTermoAtual;
     }
 
@@ -698,3 +796,4 @@ if (formNovaMulta) {
 // INICIAR
 // ============================================
 carregarMultas();
+console.log('🚀 App iniciado!');
