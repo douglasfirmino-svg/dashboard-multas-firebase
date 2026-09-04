@@ -111,37 +111,28 @@ function atualizarDashboard() {
   atualizarTabelaOverview();
   atualizarTabelaDetalhes();
   atualizarGraficos();
-  atualizarCityCards();
+  atualizarTabelaCentroCusto();
   atualizarStatusCards();
 }
 
-function atualizarCityCards() {
-  const container = document.getElementById('cityCardi');
-  if (!container) return;
+function atualizarTabelaCentroCusto() {
+  const corpo = document.getElementById('tabelaCentroCusto');
+  if (!corpo) return;
 
   if (multasFiltradas.length === 0) {
-    container.innerHTML = `<div class="loading">📭 Nenhuma multa registrada</div>`;
+    corpo.innerHTML = `<tr><td colspan="6" style="text-align:center; padding:30px;">📭 Nenhuma multa registrada</td></tr>`;
     return;
   }
 
-  const porCentro = {};
-  multasFiltradas.forEach(m => {
-    const centro = m['Centro de custo'] || 'Não informado';
-    if (!porCentro[centro]) porCentro[centro] = { total: 0, valor: 0, comDesconto: 0, comIndicacao: 0 };
-    porCentro[centro].total += 1;
-    porCentro[centro].valor += Number(m['Valor']) || 0;
-    if (m['Desconto Colaborador']) porCentro[centro].comDesconto += 1;
-    if (m['Indicação']) porCentro[centro].comIndicacao += 1;
-  });
-
-  container.innerHTML = Object.entries(porCentro).map(([centro, dados]) => `
-    <div class="city-card">
-      <h3>${centro}</h3>
-      <p>${dados.total} multa${dados.total !== 1 ? 's' : ''}</p>
-      <p>R$ ${dados.valor.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</p>
-      <p>💰 Desconto colaborador: ${dados.comDesconto}/${dados.total}</p>
-      <p>📝 Indicação feita: ${dados.comIndicacao}/${dados.total}</p>
-    </div>
+  corpo.innerHTML = multasFiltradas.map(m => `
+    <tr>
+      <td>${m['Placa'] || '-'}</td>
+      <td>${m['Centro de custo'] || '-'}</td>
+      <td>${m['Condutor'] || '-'}</td>
+      <td>R$ ${(Number(m['Valor']) || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</td>
+      <td>${m['Desconto Colaborador'] ? '✅ Sim' : '❌ Não'}</td>
+      <td>${m['Indicação'] ? '✅ Sim' : '❌ Não'}</td>
+    </tr>
   `).join('');
 }
 
