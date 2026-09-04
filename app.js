@@ -590,8 +590,7 @@ async function uploadTermoCloudinary(arquivo) {
   formData.append('upload_preset', CLOUDINARY_UPLOAD_PRESET);
 
   // Todos os arquivos (PDF ou imagem) usam resource_type "image":
-  // o Cloudinary trata PDFs como imagem (renderiza a 1ª página) e assim evita
-  // o bloqueio de segurança de entrega que afeta o resource_type "raw" em contas gratuitas.
+  // o Cloudinary trata PDFs como imagem (renderiza a 1ª página).
   const url = `https://api.cloudinary.com/v1_1/${CLOUDINARY_CLOUD_NAME}/image/upload`;
 
   const resposta = await fetch(url, { method: 'POST', body: formData });
@@ -600,6 +599,15 @@ async function uploadTermoCloudinary(arquivo) {
   }
   const dados = await resposta.json();
   progressoEl.textContent = '✅ Termo enviado!';
+
+  // Se o arquivo original era PDF, a entrega do .pdf puro é bloqueada em contas
+  // gratuitas do Cloudinary. Construímos a URL forçando o formato .jpg da 1ª página,
+  // que contorna esse bloqueio (o Cloudinary converte automaticamente ao servir).
+  if (arquivo.type === 'application/pdf') {
+    const urlComoJpg = dados.secure_url.replace(/\.pdf$/i, '.jpg');
+    return urlComoJpg;
+  }
+
   return dados.secure_url;
 }
 
