@@ -307,6 +307,7 @@ function criarGraficoBarra(canvasId, dados, chartRefName, horizontal = false) {
     options: {
       indexAxis: horizontal ? 'y' : 'x',
       responsive: true,
+      maintainAspectRatio: false,
       plugins: {
         legend: { display: false },
         datalabels: {
