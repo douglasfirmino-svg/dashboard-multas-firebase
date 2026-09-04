@@ -39,7 +39,7 @@
 
     <div class="tabs-container">
       <button class="tab-btn active" onclick="mudarAba('overview')">📊 Visão Geral</button>
-      <button class="tab-btn" onclick="mudarAba('por-cidade')">🏙️ Por Cidade</button>
+      <button class="tab-btn" onclick="mudarAba('por-cidade')">🏙️ Por Centro de Custo</button>
       <button class="tab-btn" onclick="mudarAba('por-status')">📌 Por Status</button>
       <button class="tab-btn" onclick="mudarAba('detalhes')">📋 Detalhes</button>
     </div>
@@ -138,7 +138,7 @@
 
     <div id="aba-por-cidade" class="tab-content">
       <section class="city-section">
-        <h2>📊 Análise por Cidade</h2>
+        <h2>📊 Análise por Centro de Custo</h2>
         <div class="city-cards" id="cityCardi">
           <div class="loading">⏳ Carregando...</div>
         </div>
@@ -174,10 +174,12 @@
                 <th>Valor</th>
                 <th>Status</th>
                 <th>AIT</th>
+                <th>Desconto Colaborador</th>
+                <th>Indicação</th>
               </tr>
             </thead>
             <tbody id="tabelaDetalhes">
-              <tr><td colspan="10" style="text-align: center; padding: 30px;">⏳ Carregando...</td></tr>
+              <tr><td colspan="12" style="text-align: center; padding: 30px;">⏳ Carregando...</td></tr>
             </tbody>
           </table>
         </div>
