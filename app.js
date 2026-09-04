@@ -127,19 +127,23 @@ function atualizarCityCards() {
     return;
   }
 
-  const porCidade = {};
+  const porCentro = {};
   multasFiltradas.forEach(m => {
-    const cidade = m['Centro de custo'] || 'Não informado';
-    if (!porCidade[cidade]) porCidade[cidade] = { total: 0, valor: 0 };
-    porCidade[cidade].total += 1;
-    porCidade[cidade].valor += Number(m['Valor']) || 0;
+    const centro = m['Centro de custo'] || 'Não informado';
+    if (!porCentro[centro]) porCentro[centro] = { total: 0, valor: 0, comDesconto: 0, comIndicacao: 0 };
+    porCentro[centro].total += 1;
+    porCentro[centro].valor += Number(m['Valor']) || 0;
+    if (m['Desconto Colaborador']) porCentro[centro].comDesconto += 1;
+    if (m['Indicação']) porCentro[centro].comIndicacao += 1;
   });
 
-  container.innerHTML = Object.entries(porCidade).map(([cidade, dados]) => `
+  container.innerHTML = Object.entries(porCentro).map(([centro, dados]) => `
     <div class="city-card">
-      <h3>${cidade}</h3>
+      <h3>${centro}</h3>
       <p>${dados.total} multa${dados.total !== 1 ? 's' : ''}</p>
       <p>R$ ${dados.valor.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</p>
+      <p>💰 Desconto colaborador: ${dados.comDesconto}/${dados.total}</p>
+      <p>📝 Indicação feita: ${dados.comIndicacao}/${dados.total}</p>
     </div>
   `).join('');
 }
@@ -156,9 +160,11 @@ function atualizarStatusCards() {
   const porStatus = {};
   multasFiltradas.forEach(m => {
     const status = m['Status'] || 'Pendente';
-    if (!porStatus[status]) porStatus[status] = { total: 0, valor: 0 };
+    if (!porStatus[status]) porStatus[status] = { total: 0, valor: 0, comDesconto: 0, comIndicacao: 0 };
     porStatus[status].total += 1;
     porStatus[status].valor += Number(m['Valor']) || 0;
+    if (m['Desconto Colaborador']) porStatus[status].comDesconto += 1;
+    if (m['Indicação']) porStatus[status].comIndicacao += 1;
   });
 
   container.innerHTML = Object.entries(porStatus).map(([status, dados]) => `
@@ -166,6 +172,8 @@ function atualizarStatusCards() {
       <h3>${status}</h3>
       <p>${dados.total} multa${dados.total !== 1 ? 's' : ''}</p>
       <p>R$ ${dados.valor.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</p>
+      <p>💰 Desconto colaborador: ${dados.comDesconto}/${dados.total}</p>
+      <p>📝 Indicação feita: ${dados.comIndicacao}/${dados.total}</p>
     </div>
   `).join('');
 }
@@ -233,6 +241,8 @@ function atualizarTabelaDetalhes() {
       <td>R$ ${(Number(m['Valor']) || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</td>
       <td>${m['Status'] || 'Pendente'}</td>
       <td>${m['Ait'] || '-'}</td>
+      <td>${m['Desconto Colaborador'] ? '✅ Sim' : '❌ Não'}</td>
+      <td>${m['Indicação'] ? '✅ Sim' : '❌ Não'}</td>
     </tr>
   `).join('');
 }
