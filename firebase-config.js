@@ -1,5 +1,5 @@
 // ============================================
-// CONFIGURAÇÃO FIREBASE - PREENCHIDO
+// CONFIGURAÇÃO FIREBASE - CORRIGIDA
 // ============================================
 
 const firebaseConfig = {
@@ -12,7 +12,11 @@ const firebaseConfig = {
 };
 
 // Inicializar Firebase
-firebase.initializeApp(firebaseConfig);
-const db = firebase.firestore();
-
-console.log('✅ Firebase configurado com sucesso!');
+try {
+  firebase.initializeApp(firebaseConfig);
+  const db = firebase.firestore();
+  console.log('✅ Firebase conectado com sucesso!');
+  window.db = db; // Tornar global
+} catch (error) {
+  console.error('❌ Erro ao inicializar Firebase:', error);
+}
