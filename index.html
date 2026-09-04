@@ -186,6 +186,14 @@
             <option value="">Todos</option>
           </select>
         </div>
+        <div class="filter-group">
+          <label>🚗 Tipo de Veículo</label>
+          <select id="tipoVeiculo" onchange="filtrarDados()">
+            <option value="">Todos</option>
+            <option value="Proprio">Proprio</option>
+            <option value="Locado">Locado</option>
+          </select>
+        </div>
         <button class="btn-limpar" onclick="limparFiltros()">↻ Limpar</button>
       </section>
 
@@ -216,6 +224,10 @@
         <div class="chart-container" style="height: 320px;">
           <h3>⚠️ Por Tipo de Infração</h3>
           <canvas id="graficoTipo"></canvas>
+        </div>
+        <div class="chart-container" style="height: 320px;">
+          <h3>🚗 Veiculo (Proprio vs Locado)</h3>
+          <canvas id="graficoVeiculo"></canvas>
         </div>
       </section>
 
@@ -257,6 +269,8 @@
                 <th>Centro de Custo</th>
                 <th>Condutor</th>
                 <th>Valor</th>
+                <th>Tipo de Veiculo</th>
+                <th>Locadora</th>
                 <th>Desconto Colaborador</th>
                 <th>Indicação</th>
               </tr>
@@ -297,6 +311,8 @@
                 <th>Cidade</th>
                 <th>Centro de Custo</th>
                 <th>Matrícula</th>
+                <th>Tipo de Veiculo</th>
+                <th>Locadora</th>
                 <th>Valor</th>
                 <th>Status</th>
                 <th>AIT</th>
@@ -381,6 +397,18 @@
                 <option value="Contestação">Contestação</option>
                 <option value="Cancelado">Cancelado</option>
               </select>
+            </div>
+            <div class="form-group">
+              <label for="f_tipoVeiculo">Tipo de Veiculo *</label>
+              <select id="f_tipoVeiculo" onchange="atualizarLocadora()">
+                <option value="Proprio">Proprio</option>
+                <option value="Locado">Locado</option>
+              </select>
+            </div>
+            <div class="form-group full-width">
+              <label for="f_locadora">Locadora (se Locado)</label>
+              <input type="text" id="f_locadora" placeholder="Nome da locadora">
+              <small style="color: #666; margin-top: 4px;">Obrigatorio apenas quando Tipo = Locado</small>
             </div>
             <div class="form-group checkbox-group">
               <label><input type="checkbox" id="f_desconto"> Desconto Colaborador aplicado</label>
