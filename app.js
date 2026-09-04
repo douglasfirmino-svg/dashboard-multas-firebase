@@ -236,6 +236,8 @@ function atualizarTabelaDetalhes() {
       <td>${m['Placa'] || '-'}</td>
       <td>${m['Condutor'] || '-'}</td>
       <td>${m['Descrição infração'] || '-'}</td>
+      <td>${m['Local'] || '-'}</td>
+      <td>${m['Cidade'] || '-'}</td>
       <td>${m['Centro de custo'] || '-'}</td>
       <td>${m['Matrícula'] || '-'}</td>
       <td>R$ ${(Number(m['Valor']) || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</td>
