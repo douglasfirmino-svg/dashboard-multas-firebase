@@ -20,3 +20,4 @@ try {
 } catch (error) {
   console.error('❌ Erro ao inicializar Firebase:', error);
 }
+
