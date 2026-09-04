@@ -266,7 +266,16 @@ function contarPor(campo) {
   return contagem;
 }
 
-function criarGraficoPizza(canvasId, dados, chartRefName) {
+const CORES_GRAFICO = ['#1e3a5f', '#2d6a4f', '#3a5a80', '#4a8f6c', '#0f2942', '#1f4d38', '#5b7a9e', '#6ba58a'];
+
+const CORES_STATUS = {
+  'Pendente': '#3a5a80',
+  'Pago': '#2d6a4f',
+  'Contestação': '#1e3a5f',
+  'Cancelado': '#0f2942'
+};
+
+function criarGraficoBarra(canvasId, dados, chartRefName) {
   const ctx = document.getElementById(canvasId);
   if (!ctx) return null;
   if (window[chartRefName] && typeof window[chartRefName].destroy === 'function') {
@@ -274,29 +283,33 @@ function criarGraficoPizza(canvasId, dados, chartRefName) {
   }
 
   window[chartRefName] = new Chart(ctx, {
-    type: 'doughnut',
+    type: 'bar',
     data: {
       labels: Object.keys(dados),
       datasets: [{
         data: Object.values(dados),
-        backgroundColor: ['#4F46E5', '#06B6D4', '#F59E0B', '#EF4444', '#10B981', '#8B5CF6', '#EC4899']
+        backgroundColor: CORES_GRAFICO
       }]
     },
-    options: { responsive: true, plugins: { legend: { position: 'bottom' } } }
+    options: {
+      responsive: true,
+      plugins: { legend: { display: false } },
+      scales: { y: { beginAtZero: true, ticks: { precision: 0 } } }
+    }
   });
   return window[chartRefName];
 }
 
 function atualizarGraficoStatus() {
-  criarGraficoPizza('graficoStatus', contarPor('Status'), 'graficoStatusChart');
+  criarGraficoBarra('graficoStatus', contarPor('Status'), 'graficoStatusChart');
 }
 
 function atualizarGraficoCidade() {
-  criarGraficoPizza('graficoCidade', contarPor('Centro de custo'), 'graficoCidadeChart');
+  criarGraficoBarra('graficoCidade', contarPor('Centro de custo'), 'graficoCidadeChart');
 }
 
 function atualizarGraficoTipo() {
-  criarGraficoPizza('graficoTipo', contarPor('Descrição infração'), 'graficoTipoChart');
+  criarGraficoBarra('graficoTipo', contarPor('Descrição infração'), 'graficoTipoChart');
 }
 
 function atualizarGraficoValor() {
@@ -314,33 +327,60 @@ function atualizarGraficoValor() {
     type: 'bar',
     data: {
       labels: Object.keys(porTipo),
-      datasets: [{ label: 'Valor (R$)', data: Object.values(porTipo), backgroundColor: '#4F46E5' }]
+      datasets: [{ label: 'Valor (R$)', data: Object.values(porTipo), backgroundColor: '#1e3a5f' }]
     },
     options: { responsive: true, plugins: { legend: { display: false } } }
   });
 }
 
 function atualizarGraficoTendencia() {
-  const porMes = {};
+  // Agrupa por mês E por status, para montar barras empilhadas
+  const meses = [];
+  const statusUnicos = new Set();
+  const porMesStatus = {};
+
   multasFiltradas.forEach(m => {
     const dataStr = m['Data infração'];
     if (!dataStr) return;
     const [, mes, ano] = dataStr.split('/');
-    const chave = `${mes}/${ano}`;
-    porMes[chave] = (porMes[chave] || 0) + 1;
+    const chaveMes = `${mes}/${ano}`;
+    const status = m['Status'] || 'Pendente';
+
+    if (!meses.includes(chaveMes)) meses.push(chaveMes);
+    statusUnicos.add(status);
+
+    if (!porMesStatus[chaveMes]) porMesStatus[chaveMes] = {};
+    porMesStatus[chaveMes][status] = (porMesStatus[chaveMes][status] || 0) + 1;
   });
+
+  // Ordena os meses cronologicamente (MM/AAAA)
+  meses.sort((a, b) => {
+    const [ma, aa] = a.split('/').map(Number);
+    const [mb, ab] = b.split('/').map(Number);
+    return aa !== ab ? aa - ab : ma - mb;
+  });
+
+  const datasets = Array.from(statusUnicos).map(status => ({
+    label: status,
+    data: meses.map(mes => (porMesStatus[mes] && porMesStatus[mes][status]) || 0),
+    backgroundColor: CORES_STATUS[status] || '#94A3B8'
+  }));
 
   const ctx = document.getElementById('graficoTendencia');
   if (!ctx) return;
   if (window.graficoTendenciaChart) window.graficoTendenciaChart.destroy();
 
   window.graficoTendenciaChart = new Chart(ctx, {
-    type: 'line',
-    data: {
-      labels: Object.keys(porMes),
-      datasets: [{ label: 'Multas por mês', data: Object.values(porMes), borderColor: '#4F46E5', tension: 0.3 }]
-    },
-    options: { responsive: true }
+    type: 'bar',
+    data: { labels: meses, datasets },
+    options: {
+      responsive: true,
+      plugins: { legend: { position: 'bottom' } },
+      scales: {
+        x: { stacked: true },
+        y: { stacked: true, beginAtZero: true, ticks: { precision: 0 } }
+      }
+    }
   });
 }
 
