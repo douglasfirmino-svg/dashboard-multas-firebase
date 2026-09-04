@@ -1,7 +1,7 @@
 // ============================================
 // APP.JS - Lógica do Dashboard de Multas SENATRAN
 // ============================================
-import { collection, onSnapshot } from "https://www.gstatic.com/firebasejs/10.7.0/firebase-firestore.js";
+import { collection, onSnapshot, doc, setDoc } from "https://www.gstatic.com/firebasejs/10.7.0/firebase-firestore.js";
 
 let todasMultas = [];
 let multasFiltradas = [];
@@ -385,6 +385,74 @@ window.filtrarDados = filtrarDados;
 window.limparFiltros = limparFiltros;
 window.filtrarTabela = filtrarTabela;
 window.exportarRelatorio = exportarRelatorio;
+
+// ============================================
+// FORMULÁRIO - NOVA MULTA
+// ============================================
+function formatarDataBR(dataISO) {
+  // Converte "2026-08-26" (input type=date) para "26/08/2026"
+  if (!dataISO) return '';
+  const [ano, mes, dia] = dataISO.split('-');
+  return `${dia}/${mes}/${ano}`;
+}
+
+async function salvarNovaMulta(evento) {
+  evento.preventDefault();
+
+  const mensagemEl = document.getElementById('formMensagem');
+  const botao = evento.target.querySelector('.btn-salvar');
+
+  const ait = document.getElementById('f_ait').value.trim();
+  const placa = document.getElementById('f_placa').value.trim().toUpperCase();
+  const valor = parseFloat(document.getElementById('f_valor').value);
+
+  if (!ait || !placa || isNaN(valor)) {
+    mensagemEl.textContent = '❌ Preencha AIT, Placa e Valor corretamente.';
+    mensagemEl.className = 'form-mensagem erro';
+    return;
+  }
+
+  const dadosMulta = {
+    'Ait': ait,
+    'Placa': placa,
+    'Codigo infração': document.getElementById('f_codigo').value.trim(),
+    'Data infração': formatarDataBR(document.getElementById('f_data').value),
+    'Valor': valor,
+    'Matrícula': document.getElementById('f_matricula').value.trim(),
+    'Descrição infração': document.getElementById('f_descricao').value.trim(),
+    'Condutor': document.getElementById('f_condutor').value.trim().toUpperCase(),
+    'Centro de custo': document.getElementById('f_centro').value.trim(),
+    'Local': document.getElementById('f_local').value.trim(),
+    'Cidade': document.getElementById('f_cidade').value.trim(),
+    'Status': document.getElementById('f_status').value,
+    'Desconto Colaborador': document.getElementById('f_desconto').checked,
+    'Indicação': document.getElementById('f_indicacao').checked
+  };
+
+  try {
+    botao.disabled = true;
+    botao.textContent = '💾 Salvando...';
+
+    const db = await aguardarFirebase();
+    await setDoc(doc(db, 'multas', ait), dadosMulta);
+
+    mensagemEl.textContent = `✅ Multa ${ait} salva com sucesso!`;
+    mensagemEl.className = 'form-mensagem sucesso';
+    evento.target.reset();
+  } catch (error) {
+    console.error('❌ Erro ao salvar multa:', error);
+    mensagemEl.textContent = '❌ Erro ao salvar. Veja o console para detalhes.';
+    mensagemEl.className = 'form-mensagem erro';
+  } finally {
+    botao.disabled = false;
+    botao.textContent = '💾 Salvar Multa';
+  }
+}
+
+const formNovaMulta = document.getElementById('formNovaMulta');
+if (formNovaMulta) {
+  formNovaMulta.addEventListener('submit', salvarNovaMulta);
+}
 
 // ============================================
 // INICIAR
