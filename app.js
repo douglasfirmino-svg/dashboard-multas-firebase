@@ -1,197 +1,401 @@
-<!DOCTYPE html>
-<html lang="pt-BR">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Dashboard de Multas SENATRAN - Firebase</title>
-  
-  <!-- Firebase -->
-  <script type="module" src="https://www.gstatic.com/firebasejs/10.7.0/firebase-app.js"></script>
-  <script type="module" src="https://www.gstatic.com/firebasejs/10.7.0/firebase-firestore.js"></script>
-  
-  <!-- Chart.js -->
-  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
-  
-  <!-- CSS -->
-  <link rel="stylesheet" href="styles.css">
-</head>
-<body>
-  <div class="dashboard-container">
-    
-    <header class="header">
-      <div class="header-top">
-        <div class="logo-section">
-          <div class="logo">📊</div>
-          <div>
-            <h1>Dashboard de Multas SENATRAN</h1>
-            <p>Gestão centralizada de notificações de trânsito</p>
-          </div>
-        </div>
-        <div class="header-right">
-          <button class="btn-export" onclick="exportarRelatorio()">📥 Exportar Relatório</button>
-        </div>
-      </div>
-    </header>
+// ============================================
+// APP.JS - Lógica do Dashboard de Multas SENATRAN
+// ============================================
+import { collection, onSnapshot } from "https://www.gstatic.com/firebasejs/10.7.0/firebase-firestore.js";
 
-    <div class="tabs-container">
-      <button class="tab-btn active" onclick="mudarAba('overview')">📊 Visão Geral</button>
-      <button class="tab-btn" onclick="mudarAba('por-cidade')">🏙️ Por Centro de Custo</button>
-      <button class="tab-btn" onclick="mudarAba('por-status')">📌 Por Status</button>
-      <button class="tab-btn" onclick="mudarAba('detalhes')">📋 Detalhes</button>
+let todasMultas = [];
+let multasFiltradas = [];
+
+// Espera o Firebase estar pronto (window.db é setado pelo firebase-config.js)
+function aguardarFirebase() {
+  return new Promise((resolve) => {
+    const checar = () => {
+      if (window.db) {
+        resolve(window.db);
+      } else {
+        console.log('⏳ Aguardando Firebase...');
+        setTimeout(checar, 200);
+      }
+    };
+    checar();
+  });
+}
+
+// ============================================
+// CARREGAR DADOS DO FIRESTORE
+// ============================================
+async function carregarMultas() {
+  const db = await aguardarFirebase();
+  const multasRef = collection(db, "multas");
+
+  // onSnapshot escuta mudanças em tempo real
+  onSnapshot(multasRef, (snapshot) => {
+    todasMultas = [];
+    snapshot.forEach((doc) => {
+      todasMultas.push({ id: doc.id, ...doc.data() });
+    });
+    console.log(`✅ ${todasMultas.length} multa(s) carregada(s)`);
+
+    document.getElementById('footerTime').textContent = new Date().toLocaleTimeString('pt-BR');
+
+    popularFiltroCidade();
+    filtrarDados();
+  }, (error) => {
+    console.error('❌ Erro ao buscar multas:', error);
+  });
+}
+
+// ============================================
+// FILTROS
+// ============================================
+function popularFiltroCidade() {
+  const select = document.getElementById('cidade');
+  const cidadesAtuais = new Set(Array.from(select.options).map(o => o.value));
+  const cidades = new Set(todasMultas.map(m => m['Centro de custo']).filter(Boolean));
+
+  cidades.forEach(cidade => {
+    if (!cidadesAtuais.has(cidade)) {
+      const opt = document.createElement('option');
+      opt.value = cidade;
+      opt.textContent = cidade;
+      select.appendChild(opt);
+    }
+  });
+}
+
+function filtrarDados() {
+  const periodo = document.getElementById('periodo').value;
+  const status = document.getElementById('status').value;
+  const placa = document.getElementById('placa').value.trim().toUpperCase();
+  const cidade = document.getElementById('cidade').value;
+
+  multasFiltradas = todasMultas.filter(m => {
+    if (placa && !(m['Placa'] || '').toUpperCase().includes(placa)) return false;
+    if (cidade && m['Centro de custo'] !== cidade) return false;
+    if (status && m['Status'] !== status) return false;
+    if (periodo) {
+      const dataStr = m['Data infração'];
+      if (!dataStr) return false;
+      const [dia, mes, ano] = dataStr.split('/').map(Number);
+      const dataMulta = new Date(ano, mes - 1, dia);
+      const hoje = new Date();
+
+      if (periodo === 'mes') {
+        if (dataMulta.getMonth() !== hoje.getMonth() || dataMulta.getFullYear() !== hoje.getFullYear()) return false;
+      } else if (periodo === 'trimestre') {
+        const diffMeses = (hoje.getFullYear() - dataMulta.getFullYear()) * 12 + (hoje.getMonth() - dataMulta.getMonth());
+        if (diffMeses < 0 || diffMeses > 3) return false;
+      } else if (periodo === 'ano') {
+        if (dataMulta.getFullYear() !== hoje.getFullYear()) return false;
+      }
+    }
+    return true;
+  });
+
+  atualizarDashboard();
+}
+
+function limparFiltros() {
+  document.getElementById('periodo').value = '';
+  document.getElementById('status').value = '';
+  document.getElementById('placa').value = '';
+  document.getElementById('cidade').value = '';
+  filtrarDados();
+}
+
+// ============================================
+// ATUALIZAR TELA (KPIs, tabelas, gráficos)
+// ============================================
+function atualizarDashboard() {
+  atualizarKPIs();
+  atualizarTabelaOverview();
+  atualizarTabelaDetalhes();
+  atualizarGraficos();
+  atualizarCityCards();
+  atualizarStatusCards();
+}
+
+function atualizarCityCards() {
+  const container = document.getElementById('cityCardi');
+  if (!container) return;
+
+  if (multasFiltradas.length === 0) {
+    container.innerHTML = `<div class="loading">📭 Nenhuma multa registrada</div>`;
+    return;
+  }
+
+  const porCentro = {};
+  multasFiltradas.forEach(m => {
+    const centro = m['Centro de custo'] || 'Não informado';
+    if (!porCentro[centro]) porCentro[centro] = { total: 0, valor: 0, comDesconto: 0, comIndicacao: 0 };
+    porCentro[centro].total += 1;
+    porCentro[centro].valor += Number(m['Valor']) || 0;
+    if (m['Desconto Colaborador']) porCentro[centro].comDesconto += 1;
+    if (m['Indicação']) porCentro[centro].comIndicacao += 1;
+  });
+
+  container.innerHTML = Object.entries(porCentro).map(([centro, dados]) => `
+    <div class="city-card">
+      <h3>${centro}</h3>
+      <p>${dados.total} multa${dados.total !== 1 ? 's' : ''}</p>
+      <p>R$ ${dados.valor.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</p>
+      <p>💰 Desconto colaborador: ${dados.comDesconto}/${dados.total}</p>
+      <p>📝 Indicação feita: ${dados.comIndicacao}/${dados.total}</p>
     </div>
+  `).join('');
+}
 
-    <div id="aba-overview" class="tab-content active">
-      
-      <section class="filters-section">
-        <div class="filter-group">
-          <label>📅 Período</label>
-          <select id="periodo" onchange="filtrarDados()">
-            <option value="">Todos</option>
-            <option value="mes">Este mês</option>
-            <option value="trimestre">Trimestre</option>
-            <option value="ano">Este ano</option>
-          </select>
-        </div>
-        <div class="filter-group">
-          <label>📌 Status</label>
-          <select id="status" onchange="filtrarDados()">
-            <option value="">Todos</option>
-            <option value="Pendente">Pendente</option>
-            <option value="Pago">Pago</option>
-            <option value="Contestação">Contestação</option>
-            <option value="Cancelado">Cancelado</option>
-          </select>
-        </div>
-        <div class="filter-group">
-          <label>🚗 Placa</label>
-          <input type="text" id="placa" placeholder="RIA5H47" onkeyup="filtrarDados()">
-        </div>
-        <div class="filter-group">
-          <label>🏙️ Cidade</label>
-          <select id="cidade" onchange="filtrarDados()">
-            <option value="">Todas</option>
-          </select>
-        </div>
-        <button class="btn-limpar" onclick="limparFiltros()">↻ Limpar</button>
-      </section>
+function atualizarStatusCards() {
+  const container = document.getElementById('statusCards');
+  if (!container) return;
 
-      <section class="kpi-cards" id="kpiCards">
-        <div class="loading">⏳ Carregando dados...</div>
-      </section>
+  if (multasFiltradas.length === 0) {
+    container.innerHTML = `<div class="loading">📭 Nenhuma multa registrada</div>`;
+    return;
+  }
 
-      <section class="charts-row">
-        <div class="chart-container">
-          <h3>📊 Multas por Status</h3>
-          <canvas id="graficoStatus"></canvas>
-        </div>
-        <div class="chart-container">
-          <h3>💰 Valor por Tipo</h3>
-          <canvas id="graficoValor"></canvas>
-        </div>
-        <div class="chart-container">
-          <h3>🏙️ Multas por Cidade</h3>
-          <canvas id="graficoCidade"></canvas>
-        </div>
-      </section>
+  const porStatus = {};
+  multasFiltradas.forEach(m => {
+    const status = m['Status'] || 'Pendente';
+    if (!porStatus[status]) porStatus[status] = { total: 0, valor: 0, comDesconto: 0, comIndicacao: 0 };
+    porStatus[status].total += 1;
+    porStatus[status].valor += Number(m['Valor']) || 0;
+    if (m['Desconto Colaborador']) porStatus[status].comDesconto += 1;
+    if (m['Indicação']) porStatus[status].comIndicacao += 1;
+  });
 
-      <section class="charts-row">
-        <div class="chart-container full">
-          <h3>📈 Tendência Mensal</h3>
-          <canvas id="graficoTendencia"></canvas>
-        </div>
-        <div class="chart-container">
-          <h3>⚠️ Por Tipo de Infração</h3>
-          <canvas id="graficoTipo"></canvas>
-        </div>
-      </section>
-
-      <section class="table-section">
-        <div class="table-header">
-          <h2>📋 Multas Registradas</h2>
-          <span id="totalRegistros" class="total-registros">0 registros</span>
-        </div>
-        <div class="table-wrapper">
-          <table class="data-table">
-            <thead>
-              <tr>
-                <th>AIT</th>
-                <th>Data</th>
-                <th>Placa</th>
-                <th>Descrição</th>
-                <th>Centro de Custo</th>
-                <th>Código</th>
-                <th>Valor</th>
-                <th>Status</th>
-              </tr>
-            </thead>
-            <tbody id="tabelaCorpo">
-              <tr><td colspan="8" style="text-align: center; padding: 30px;">⏳ Carregando...</td></tr>
-            </tbody>
-          </table>
-        </div>
-      </section>
+  container.innerHTML = Object.entries(porStatus).map(([status, dados]) => `
+    <div class="status-card">
+      <h3>${status}</h3>
+      <p>${dados.total} multa${dados.total !== 1 ? 's' : ''}</p>
+      <p>R$ ${dados.valor.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</p>
+      <p>💰 Desconto colaborador: ${dados.comDesconto}/${dados.total}</p>
+      <p>📝 Indicação feita: ${dados.comIndicacao}/${dados.total}</p>
     </div>
+  `).join('');
+}
 
-    <div id="aba-por-cidade" class="tab-content">
-      <section class="city-section">
-        <h2>📊 Análise por Centro de Custo</h2>
-        <div class="city-cards" id="cityCardi">
-          <div class="loading">⏳ Carregando...</div>
-        </div>
-      </section>
+function atualizarKPIs() {
+  const total = multasFiltradas.length;
+  const valorTotal = multasFiltradas.reduce((soma, m) => soma + (Number(m['Valor']) || 0), 0);
+  const pendentes = multasFiltradas.filter(m => m['Status'] === 'Pendente').length;
+
+  document.getElementById('kpiCards').innerHTML = `
+    <div class="kpi-card">
+      <div class="kpi-label">Total de Multas</div>
+      <div class="kpi-value">${total}</div>
     </div>
-
-    <div id="aba-por-status" class="tab-content">
-      <section class="status-section">
-        <h2>📌 Análise por Status</h2>
-        <div class="status-cards" id="statusCards">
-          <div class="loading">⏳ Carregando...</div>
-        </div>
-      </section>
+    <div class="kpi-card">
+      <div class="kpi-label">Valor Total</div>
+      <div class="kpi-value">R$ ${valorTotal.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</div>
     </div>
-
-    <div id="aba-detalhes" class="tab-content">
-      <section class="details-section">
-        <h2>📋 Detalhes Completos</h2>
-        <div class="details-filters">
-          <input type="text" id="filterTabela" placeholder="🔍 Filtrar tabela..." onkeyup="filtrarTabela()">
-        </div>
-        <div class="table-wrapper">
-          <table class="details-table">
-            <thead>
-              <tr>
-                <th>Código</th>
-                <th>Data</th>
-                <th>Placa</th>
-                <th>Motorista</th>
-                <th>Descrição</th>
-                <th>Local</th>
-                <th>Cidade</th>
-                <th>Centro de Custo</th>
-                <th>Matrícula</th>
-                <th>Valor</th>
-                <th>Status</th>
-                <th>AIT</th>
-                <th>Desconto Colaborador</th>
-                <th>Indicação</th>
-              </tr>
-            </thead>
-            <tbody id="tabelaDetalhes">
-              <tr><td colspan="14" style="text-align: center; padding: 30px;">⏳ Carregando...</td></tr>
-            </tbody>
-          </table>
-        </div>
-      </section>
+    <div class="kpi-card">
+      <div class="kpi-label">Pendentes</div>
+      <div class="kpi-value">${pendentes}</div>
     </div>
+  `;
 
-  </div>
+  document.getElementById('totalRegistros').textContent = `${total} registro${total !== 1 ? 's' : ''}`;
+}
 
-  <footer class="footer">
-    <p>Dashboard de Multas SENATRAN | v3.0 Firebase (100% Grátis)</p>
-    <p>Última atualização: <span id="footerTime">--:--:--</span></p>
-  </footer>
+function atualizarTabelaOverview() {
+  const corpo = document.getElementById('tabelaCorpo');
+  if (multasFiltradas.length === 0) {
+    corpo.innerHTML = `<tr><td colspan="8" style="text-align:center; padding:30px;">📭 Nenhuma multa registrada<br><small>Importe dados via Firebase para começar</small></td></tr>`;
+    return;
+  }
 
-  <script type="module" src="firebase-config.js"></script>
-  <script type="module" src="app.js"></script>
-</body>
-</html>
+  corpo.innerHTML = multasFiltradas.map(m => `
+    <tr>
+      <td>${m['Ait'] || '-'}</td>
+      <td>${m['Data infração'] || '-'}</td>
+      <td>${m['Placa'] || '-'}</td>
+      <td>${m['Descrição infração'] || '-'}</td>
+      <td>${m['Centro de custo'] || '-'}</td>
+      <td>${m['Codigo infração'] || '-'}</td>
+      <td>R$ ${(Number(m['Valor']) || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</td>
+      <td>${m['Status'] || 'Pendente'}</td>
+    </tr>
+  `).join('');
+}
+
+function atualizarTabelaDetalhes() {
+  const corpo = document.getElementById('tabelaDetalhes');
+  if (multasFiltradas.length === 0) {
+    corpo.innerHTML = `<tr><td colspan="10" style="text-align:center; padding:30px;">📭 Nenhuma multa registrada</td></tr>`;
+    return;
+  }
+
+  corpo.innerHTML = multasFiltradas.map(m => `
+    <tr>
+      <td>${m['Codigo infração'] || '-'}</td>
+      <td>${m['Data infração'] || '-'}</td>
+      <td>${m['Placa'] || '-'}</td>
+      <td>${m['Condutor'] || '-'}</td>
+      <td>${m['Descrição infração'] || '-'}</td>
+      <td>${m['Local'] || '-'}</td>
+      <td>${m['Cidade'] || '-'}</td>
+      <td>${m['Centro de custo'] || '-'}</td>
+      <td>${m['Matrícula'] || '-'}</td>
+      <td>R$ ${(Number(m['Valor']) || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</td>
+      <td>${m['Status'] || 'Pendente'}</td>
+      <td>${m['Ait'] || '-'}</td>
+      <td>${m['Desconto Colaborador'] ? '✅ Sim' : '❌ Não'}</td>
+      <td>${m['Indicação'] ? '✅ Sim' : '❌ Não'}</td>
+    </tr>
+  `).join('');
+}
+
+function filtrarTabela() {
+  const termo = document.getElementById('filterTabela').value.trim().toLowerCase();
+  const linhas = document.querySelectorAll('#tabelaDetalhes tr');
+  linhas.forEach(linha => {
+    const texto = linha.textContent.toLowerCase();
+    linha.style.display = texto.includes(termo) ? '' : 'none';
+  });
+}
+
+// ============================================
+// GRÁFICOS (Chart.js)
+// ============================================
+function atualizarGraficos() {
+  atualizarGraficoStatus();
+  atualizarGraficoValor();
+  atualizarGraficoCidade();
+  atualizarGraficoTendencia();
+  atualizarGraficoTipo();
+}
+
+function contarPor(campo) {
+  const contagem = {};
+  multasFiltradas.forEach(m => {
+    const chave = m[campo] || 'Não informado';
+    contagem[chave] = (contagem[chave] || 0) + 1;
+  });
+  return contagem;
+}
+
+function criarGraficoPizza(canvasId, dados, chartRefName) {
+  const ctx = document.getElementById(canvasId);
+  if (!ctx) return null;
+  if (window[chartRefName] && typeof window[chartRefName].destroy === 'function') {
+    window[chartRefName].destroy();
+  }
+
+  window[chartRefName] = new Chart(ctx, {
+    type: 'doughnut',
+    data: {
+      labels: Object.keys(dados),
+      datasets: [{
+        data: Object.values(dados),
+        backgroundColor: ['#4F46E5', '#06B6D4', '#F59E0B', '#EF4444', '#10B981', '#8B5CF6', '#EC4899']
+      }]
+    },
+    options: { responsive: true, plugins: { legend: { position: 'bottom' } } }
+  });
+  return window[chartRefName];
+}
+
+function atualizarGraficoStatus() {
+  criarGraficoPizza('graficoStatus', contarPor('Status'), 'graficoStatusChart');
+}
+
+function atualizarGraficoCidade() {
+  criarGraficoPizza('graficoCidade', contarPor('Centro de custo'), 'graficoCidadeChart');
+}
+
+function atualizarGraficoTipo() {
+  criarGraficoPizza('graficoTipo', contarPor('Descrição infração'), 'graficoTipoChart');
+}
+
+function atualizarGraficoValor() {
+  const porTipo = {};
+  multasFiltradas.forEach(m => {
+    const tipo = m['Descrição infração'] || 'Não informado';
+    porTipo[tipo] = (porTipo[tipo] || 0) + (Number(m['Valor']) || 0);
+  });
+
+  const ctx = document.getElementById('graficoValor');
+  if (!ctx) return;
+  if (window.graficoValorChart) window.graficoValorChart.destroy();
+
+  window.graficoValorChart = new Chart(ctx, {
+    type: 'bar',
+    data: {
+      labels: Object.keys(porTipo),
+      datasets: [{ label: 'Valor (R$)', data: Object.values(porTipo), backgroundColor: '#4F46E5' }]
+    },
+    options: { responsive: true, plugins: { legend: { display: false } } }
+  });
+}
+
+function atualizarGraficoTendencia() {
+  const porMes = {};
+  multasFiltradas.forEach(m => {
+    const dataStr = m['Data infração'];
+    if (!dataStr) return;
+    const [, mes, ano] = dataStr.split('/');
+    const chave = `${mes}/${ano}`;
+    porMes[chave] = (porMes[chave] || 0) + 1;
+  });
+
+  const ctx = document.getElementById('graficoTendencia');
+  if (!ctx) return;
+  if (window.graficoTendenciaChart) window.graficoTendenciaChart.destroy();
+
+  window.graficoTendenciaChart = new Chart(ctx, {
+    type: 'line',
+    data: {
+      labels: Object.keys(porMes),
+      datasets: [{ label: 'Multas por mês', data: Object.values(porMes), borderColor: '#4F46E5', tension: 0.3 }]
+    },
+    options: { responsive: true }
+  });
+}
+
+// ============================================
+// ABAS
+// ============================================
+function mudarAba(aba, evt) {
+  document.querySelectorAll('.tab-content').forEach(el => el.classList.remove('active'));
+  document.querySelectorAll('.tab-btn').forEach(el => el.classList.remove('active'));
+
+  document.getElementById(`aba-${aba}`).classList.add('active');
+  const botao = (evt && evt.currentTarget) || window.event?.currentTarget;
+  if (botao) botao.classList.add('active');
+}
+
+// ============================================
+// EXPORTAR RELATÓRIO
+// ============================================
+function exportarRelatorio() {
+  if (multasFiltradas.length === 0) {
+    alert('Nenhuma multa para exportar.');
+    return;
+  }
+
+  const cabecalho = ['Ait', 'Placa', 'Centro de custo', 'Data infração', 'Codigo infração', 'Descrição infração', 'Valor', 'Condutor', 'Matrícula', 'Status'];
+  const linhas = multasFiltradas.map(m => cabecalho.map(campo => `"${m[campo] || ''}"`).join(','));
+  const csv = [cabecalho.join(','), ...linhas].join('\n');
+
+  const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  link.href = url;
+  link.download = `relatorio-multas-${new Date().toISOString().slice(0, 10)}.csv`;
+  link.click();
+}
+
+// ============================================
+// TORNAR FUNÇÕES GLOBAIS (necessário com type="module")
+// ============================================
+window.mudarAba = mudarAba;
+window.filtrarDados = filtrarDados;
+window.limparFiltros = limparFiltros;
+window.filtrarTabela = filtrarTabela;
+window.exportarRelatorio = exportarRelatorio;
+
+// ============================================
+// INICIAR
+// ============================================
+carregarMultas();
