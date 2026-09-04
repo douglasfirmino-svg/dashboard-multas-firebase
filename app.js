@@ -589,10 +589,10 @@ async function uploadTermoCloudinary(arquivo) {
   formData.append('file', arquivo);
   formData.append('upload_preset', CLOUDINARY_UPLOAD_PRESET);
 
-  // PDFs e arquivos genéricos usam resource_type "raw" para evitar bloqueio de segurança;
-  // imagens usam "image" para otimização automática do Cloudinary.
-  const tipoRecurso = arquivo.type === 'application/pdf' ? 'raw' : 'image';
-  const url = `https://api.cloudinary.com/v1_1/${CLOUDINARY_CLOUD_NAME}/${tipoRecurso}/upload`;
+  // Todos os arquivos (PDF ou imagem) usam resource_type "image":
+  // o Cloudinary trata PDFs como imagem (renderiza a 1ª página) e assim evita
+  // o bloqueio de segurança de entrega que afeta o resource_type "raw" em contas gratuitas.
+  const url = `https://api.cloudinary.com/v1_1/${CLOUDINARY_CLOUD_NAME}/image/upload`;
 
   const resposta = await fetch(url, { method: 'POST', body: formData });
   if (!resposta.ok) {
