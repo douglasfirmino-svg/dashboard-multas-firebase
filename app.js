@@ -472,6 +472,7 @@ window.filtrarTabela = filtrarTabela;
 window.exportarRelatorio = exportarRelatorio;
 window.buscarMultaPorAit = buscarMultaPorAit;
 window.limparFormulario = limparFormulario;
+window.removerTermo = removerTermo;
 
 // ============================================
 // FORMULÁRIO - BUSCAR MULTA EXISTENTE (para editar)
@@ -504,11 +505,38 @@ function preencherFormulario(dados, ait) {
   urlTermoAtual = dados['Termo URL'] || null;
   const termoAtualEl = document.getElementById('termoAtual');
   termoAtualEl.innerHTML = urlTermoAtual
-    ? `📎 Termo já anexado: <a href="${urlTermoAtual}" target="_blank">ver arquivo atual</a> (envie um novo arquivo acima para substituir)`
+    ? `📎 Termo já anexado: <a href="${urlTermoAtual}" target="_blank">ver arquivo atual</a> (envie um novo arquivo acima para substituir) &nbsp;
+       <button type="button" class="btn-remover-termo" onclick="removerTermo()">🗑️ Remover Termo</button>`
     : '';
 
   // AIT não pode ser editado depois de encontrado (é a chave do documento)
   document.getElementById('f_ait').disabled = true;
+}
+
+async function removerTermo() {
+  if (!aitEmEdicao) return;
+
+  const confirmar = confirm('Tem certeza que deseja remover o termo anexado desta multa? Essa ação não pode ser desfeita.');
+  if (!confirmar) return;
+
+  try {
+    const db = await aguardarFirebase();
+    const docRef = doc(db, 'multas', aitEmEdicao);
+    const docSnap = await getDoc(docRef);
+
+    if (docSnap.exists()) {
+      const dadosAtuais = docSnap.data();
+      delete dadosAtuais['Termo URL'];
+      await setDoc(docRef, dadosAtuais);
+    }
+
+    urlTermoAtual = null;
+    document.getElementById('termoAtual').innerHTML = '✅ Termo removido.';
+    document.getElementById('f_termo').value = '';
+  } catch (error) {
+    console.error('❌ Erro ao remover termo:', error);
+    alert('❌ Erro ao remover o termo. Veja o console para detalhes.');
+  }
 }
 
 async function buscarMultaPorAit() {
