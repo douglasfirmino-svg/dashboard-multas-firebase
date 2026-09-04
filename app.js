@@ -1,7 +1,7 @@
 // ============================================
 // APP.JS - Lógica do Dashboard de Multas SENATRAN
 // ============================================
-import { collection, onSnapshot, doc, setDoc } from "https://www.gstatic.com/firebasejs/10.7.0/firebase-firestore.js";
+import { collection, onSnapshot, doc, setDoc, getDoc } from "https://www.gstatic.com/firebasejs/10.7.0/firebase-firestore.js";
 
 let todasMultas = [];
 let multasFiltradas = [];
@@ -385,10 +385,80 @@ window.filtrarDados = filtrarDados;
 window.limparFiltros = limparFiltros;
 window.filtrarTabela = filtrarTabela;
 window.exportarRelatorio = exportarRelatorio;
+window.buscarMultaPorAit = buscarMultaPorAit;
+window.limparFormulario = limparFormulario;
 
 // ============================================
-// FORMULÁRIO - NOVA MULTA
+// FORMULÁRIO - BUSCAR MULTA EXISTENTE (para editar)
 // ============================================
+let aitEmEdicao = null; // guarda se estamos editando uma multa existente
+
+function preencherFormulario(dados, ait) {
+  document.getElementById('f_ait').value = ait;
+  document.getElementById('f_placa').value = dados['Placa'] || '';
+  document.getElementById('f_codigo').value = dados['Codigo infração'] || '';
+  document.getElementById('f_valor').value = dados['Valor'] || '';
+  document.getElementById('f_matricula').value = dados['Matrícula'] || '';
+  document.getElementById('f_descricao').value = dados['Descrição infração'] || '';
+  document.getElementById('f_condutor').value = dados['Condutor'] || '';
+  document.getElementById('f_centro').value = dados['Centro de custo'] || '';
+  document.getElementById('f_local').value = dados['Local'] || '';
+  document.getElementById('f_cidade').value = dados['Cidade'] || '';
+  document.getElementById('f_status').value = dados['Status'] || 'Pendente';
+  document.getElementById('f_desconto').checked = !!dados['Desconto Colaborador'];
+  document.getElementById('f_indicacao').checked = !!dados['Indicação'];
+
+  // Converte data de DD/MM/AAAA para AAAA-MM-DD (formato do input date)
+  const dataStr = dados['Data infração'];
+  if (dataStr) {
+    const [dia, mes, ano] = dataStr.split('/');
+    document.getElementById('f_data').value = `${ano}-${mes}-${dia}`;
+  }
+
+  // AIT não pode ser editado depois de encontrado (é a chave do documento)
+  document.getElementById('f_ait').disabled = true;
+}
+
+async function buscarMultaPorAit() {
+  const ait = document.getElementById('buscarAit').value.trim();
+  const mensagemEl = document.getElementById('buscaMensagem');
+
+  if (!ait) {
+    mensagemEl.textContent = '❌ Digite um AIT para buscar.';
+    mensagemEl.className = 'form-mensagem erro';
+    return;
+  }
+
+  try {
+    const db = await aguardarFirebase();
+    const docRef = doc(db, 'multas', ait);
+    const docSnap = await getDoc(docRef);
+
+    if (docSnap.exists()) {
+      preencherFormulario(docSnap.data(), ait);
+      aitEmEdicao = ait;
+      mensagemEl.textContent = `✅ Multa ${ait} carregada. Edite os campos e clique em Salvar.`;
+      mensagemEl.className = 'form-mensagem sucesso';
+    } else {
+      mensagemEl.textContent = `⚠️ Nenhuma multa encontrada com AIT ${ait}. Você pode cadastrar como nova.`;
+      mensagemEl.className = 'form-mensagem erro';
+    }
+  } catch (error) {
+    console.error('❌ Erro ao buscar multa:', error);
+    mensagemEl.textContent = '❌ Erro ao buscar. Veja o console.';
+    mensagemEl.className = 'form-mensagem erro';
+  }
+}
+
+function limparFormulario() {
+  document.getElementById('formNovaMulta').reset();
+  document.getElementById('f_ait').disabled = false;
+  document.getElementById('buscarAit').value = '';
+  document.getElementById('buscaMensagem').textContent = '';
+  aitEmEdicao = null;
+}
+
+
 function formatarDataBR(dataISO) {
   // Converte "2026-08-26" (input type=date) para "26/08/2026"
   if (!dataISO) return '';
@@ -436,9 +506,12 @@ async function salvarNovaMulta(evento) {
     const db = await aguardarFirebase();
     await setDoc(doc(db, 'multas', ait), dadosMulta);
 
-    mensagemEl.textContent = `✅ Multa ${ait} salva com sucesso!`;
+    const foiEdicao = aitEmEdicao === ait;
+    mensagemEl.textContent = foiEdicao
+      ? `✅ Multa ${ait} atualizada com sucesso!`
+      : `✅ Multa ${ait} cadastrada com sucesso!`;
     mensagemEl.className = 'form-mensagem sucesso';
-    evento.target.reset();
+    limparFormulario();
   } catch (error) {
     console.error('❌ Erro ao salvar multa:', error);
     mensagemEl.textContent = '❌ Erro ao salvar. Veja o console para detalhes.';
