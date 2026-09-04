@@ -404,6 +404,7 @@ function atualizarGraficoTendencia() {
     data: { labels: meses, datasets },
     options: {
       responsive: true,
+      maintainAspectRatio: false,
       plugins: {
         legend: { position: 'bottom' },
         datalabels: {
