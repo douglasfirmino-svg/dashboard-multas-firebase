@@ -14,6 +14,51 @@
   
   <!-- CSS -->
   <link rel="stylesheet" href="styles.css">
+
+  <style>
+    .multa-form { max-width: 900px; }
+    .form-grid {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 16px;
+      margin-bottom: 20px;
+    }
+    .form-group { display: flex; flex-direction: column; gap: 6px; }
+    .form-group.full-width { grid-column: 1 / -1; }
+    .form-group label { font-weight: 600; font-size: 0.9em; color: #334155; }
+    .form-group input[type="text"],
+    .form-group input[type="date"],
+    .form-group input[type="number"],
+    .form-group select {
+      padding: 10px 12px;
+      border: 1px solid #cbd5e1;
+      border-radius: 8px;
+      font-size: 1em;
+    }
+    .form-group.checkbox-group label {
+      flex-direction: row;
+      align-items: center;
+      gap: 8px;
+      font-weight: 500;
+    }
+    .btn-salvar {
+      background: linear-gradient(135deg, #1e3a5f, #2d6a4f);
+      color: white;
+      border: none;
+      padding: 12px 28px;
+      border-radius: 8px;
+      font-weight: 600;
+      font-size: 1em;
+      cursor: pointer;
+    }
+    .btn-salvar:hover { opacity: 0.9; }
+    .form-mensagem { margin: 12px 0; font-weight: 600; min-height: 24px; }
+    .form-mensagem.sucesso { color: #16a34a; }
+    .form-mensagem.erro { color: #dc2626; }
+    @media (max-width: 640px) {
+      .form-grid { grid-template-columns: 1fr; }
+    }
+  </style>
 </head>
 <body>
   <div class="dashboard-container">
@@ -38,6 +83,7 @@
       <button class="tab-btn" onclick="mudarAba('por-cidade')">🏙️ Por Centro de Custo</button>
       <button class="tab-btn" onclick="mudarAba('por-status')">📌 Por Status</button>
       <button class="tab-btn" onclick="mudarAba('detalhes')">📋 Detalhes</button>
+      <button class="tab-btn" onclick="mudarAba('nova-multa')">➕ Nova Multa</button>
     </div>
 
     <div id="aba-overview" class="tab-content active">
@@ -195,6 +241,77 @@
             </tbody>
           </table>
         </div>
+      </section>
+    </div>
+
+    <div id="aba-nova-multa" class="tab-content">
+      <section class="form-section">
+        <h2>➕ Cadastrar Nova Multa</h2>
+        <form id="formNovaMulta" class="multa-form">
+          <div class="form-grid">
+            <div class="form-group">
+              <label for="f_ait">AIT (identificador único) *</label>
+              <input type="text" id="f_ait" required placeholder="Ex: V080032678">
+            </div>
+            <div class="form-group">
+              <label for="f_placa">Placa *</label>
+              <input type="text" id="f_placa" required placeholder="Ex: RIA5H47">
+            </div>
+            <div class="form-group">
+              <label for="f_codigo">Código Infração</label>
+              <input type="text" id="f_codigo" placeholder="Ex: 7455">
+            </div>
+            <div class="form-group">
+              <label for="f_data">Data Infração *</label>
+              <input type="date" id="f_data" required>
+            </div>
+            <div class="form-group">
+              <label for="f_valor">Valor (R$) *</label>
+              <input type="number" id="f_valor" step="0.01" required placeholder="Ex: 130.16">
+            </div>
+            <div class="form-group">
+              <label for="f_matricula">Matrícula</label>
+              <input type="text" id="f_matricula" placeholder="Ex: 7719">
+            </div>
+            <div class="form-group full-width">
+              <label for="f_descricao">Descrição da Infração</label>
+              <input type="text" id="f_descricao" placeholder="Ex: TRANSITAR EM VELOCIDADE SUPERIOR...">
+            </div>
+            <div class="form-group">
+              <label for="f_condutor">Condutor / Motorista</label>
+              <input type="text" id="f_condutor" placeholder="Ex: LUIZ CLAUDIO SOARES BENTO">
+            </div>
+            <div class="form-group">
+              <label for="f_centro">Centro de Custo</label>
+              <input type="text" id="f_centro" placeholder="Ex: ENEL CE AGENTE COMERCIAL">
+            </div>
+            <div class="form-group">
+              <label for="f_local">Local</label>
+              <input type="text" id="f_local" placeholder="Ex: Av. Beira Mar">
+            </div>
+            <div class="form-group">
+              <label for="f_cidade">Cidade</label>
+              <input type="text" id="f_cidade" placeholder="Ex: Fortaleza">
+            </div>
+            <div class="form-group">
+              <label for="f_status">Status</label>
+              <select id="f_status">
+                <option value="Pendente">Pendente</option>
+                <option value="Pago">Pago</option>
+                <option value="Contestação">Contestação</option>
+                <option value="Cancelado">Cancelado</option>
+              </select>
+            </div>
+            <div class="form-group checkbox-group">
+              <label><input type="checkbox" id="f_desconto"> Desconto Colaborador aplicado</label>
+            </div>
+            <div class="form-group checkbox-group">
+              <label><input type="checkbox" id="f_indicacao"> Indicação do condutor feita</label>
+            </div>
+          </div>
+          <div id="formMensagem" class="form-mensagem"></div>
+          <button type="submit" class="btn-salvar">💾 Salvar Multa</button>
+        </form>
       </section>
     </div>
 
