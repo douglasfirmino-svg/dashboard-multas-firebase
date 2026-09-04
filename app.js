@@ -355,16 +355,20 @@ function atualizarGraficoValor() {
       datasets: [{ label: 'Valor (R$)', data: Object.values(porTipo), backgroundColor: '#1e3a5f' }]
     },
     options: {
+      indexAxis: 'y',
       responsive: true,
       plugins: {
         legend: { display: false },
         datalabels: {
           anchor: 'end',
-          align: 'top',
+          align: 'end',
           color: '#1e3a5f',
           font: { weight: 'bold' },
           formatter: (valor) => `R$ ${valor.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`
         }
+      },
+      scales: {
+        x: { beginAtZero: true }
       }
     }
   });
