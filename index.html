@@ -8,7 +8,10 @@
   <!-- Firebase -->
   <script type="module" src="https://www.gstatic.com/firebasejs/10.7.0/firebase-app.js"></script>
   <script type="module" src="https://www.gstatic.com/firebasejs/10.7.0/firebase-firestore.js"></script>
-  
+
+  <!-- EmailJS -->
+  <script src="https://cdn.jsdelivr.net/npm/@emailjs/browser@4.4.1/dist/index.min.js"></script>
+
   <!-- Chart.js -->
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2.2.0/dist/chartjs-plugin-datalabels.min.js"></script>
@@ -409,6 +412,11 @@
               <label for="f_locadora">Locadora (se Locado)</label>
               <input type="text" id="f_locadora" placeholder="Nome da locadora">
               <small style="color: #666; margin-top: 4px;">Obrigatorio apenas quando Tipo = Locado</small>
+            </div>
+            <div class="form-group full-width">
+              <label for="f_emailSupervisor">Email do Supervisor *</label>
+              <input type="email" id="f_emailSupervisor" placeholder="supervisor@empresa.com">
+              <small style="color: #666; margin-top: 4px;">O termo será enviado para este email</small>
             </div>
             <div class="form-group checkbox-group">
               <label><input type="checkbox" id="f_desconto"> Desconto Colaborador aplicado</label>
