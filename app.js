@@ -25,7 +25,22 @@ let EMAILJS_SERVICE_ID = '';
 let EMAILJS_TEMPLATE_ID = '';
 let EMAILJS_PUBLIC_KEY = '';
 
-function inicializarEmailJS() {
+function aguardarENV() {
+  return new Promise((resolve) => {
+    const checar = () => {
+      if (window.ENV && window.ENV.VITE_EMAILJS_PUBLIC_KEY) {
+        resolve();
+      } else {
+        setTimeout(checar, 100);
+      }
+    };
+    checar();
+  });
+}
+
+async function inicializarEmailJS() {
+  await aguardarENV();
+
   if (typeof emailjs !== 'undefined' && window.ENV) {
     EMAILJS_PUBLIC_KEY = window.ENV.VITE_EMAILJS_PUBLIC_KEY || '';
     EMAILJS_SERVICE_ID = window.ENV.VITE_EMAILJS_SERVICE_ID || '';
