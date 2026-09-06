@@ -26,10 +26,10 @@ let EMAILJS_TEMPLATE_ID = '';
 let EMAILJS_PUBLIC_KEY = '';
 
 function inicializarEmailJS() {
-  if (typeof emailjs !== 'undefined') {
-    EMAILJS_PUBLIC_KEY = import.meta.env.VITE_EMAILJS_PUBLIC_KEY || '';
-    EMAILJS_SERVICE_ID = import.meta.env.VITE_EMAILJS_SERVICE_ID || '';
-    EMAILJS_TEMPLATE_ID = import.meta.env.VITE_EMAILJS_TEMPLATE_ID || '';
+  if (typeof emailjs !== 'undefined' && window.ENV) {
+    EMAILJS_PUBLIC_KEY = window.ENV.VITE_EMAILJS_PUBLIC_KEY || '';
+    EMAILJS_SERVICE_ID = window.ENV.VITE_EMAILJS_SERVICE_ID || '';
+    EMAILJS_TEMPLATE_ID = window.ENV.VITE_EMAILJS_TEMPLATE_ID || '';
 
     if (EMAILJS_PUBLIC_KEY) {
       emailjs.init(EMAILJS_PUBLIC_KEY);
