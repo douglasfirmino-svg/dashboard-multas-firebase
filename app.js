@@ -146,7 +146,6 @@ function atualizarDashboard() {
   atualizarTabelaDetalhes();
   atualizarGraficos();
   atualizarTabelaCentroCusto();
-  atualizarStatusCards();
   atualizarAnalyticsKPIs();
   atualizarRankingCondutores();
   atualizarCidadesCards();
@@ -172,36 +171,6 @@ function atualizarTabelaCentroCusto() {
       <td>${m['Desconto Colaborador'] ? '✅ Sim' : '❌ Não'}</td>
       <td>${m['Indicação'] ? '✅ Sim' : '❌ Não'}</td>
     </tr>
-  `).join('');
-}
-
-function atualizarStatusCards() {
-  const container = document.getElementById('statusCards');
-  if (!container) return;
-
-  if (multasFiltradas.length === 0) {
-    container.innerHTML = `<div class="loading">📭 Nenhuma multa registrada</div>`;
-    return;
-  }
-
-  const porStatus = {};
-  multasFiltradas.forEach(m => {
-    const status = m['Status'] || 'Pendente';
-    if (!porStatus[status]) porStatus[status] = { total: 0, valor: 0, comDesconto: 0, comIndicacao: 0 };
-    porStatus[status].total += 1;
-    porStatus[status].valor += Number(m['Valor']) || 0;
-    if (m['Desconto Colaborador']) porStatus[status].comDesconto += 1;
-    if (m['Indicação']) porStatus[status].comIndicacao += 1;
-  });
-
-  container.innerHTML = Object.entries(porStatus).map(([status, dados]) => `
-    <div class="status-card">
-      <h3>${status}</h3>
-      <p>${dados.total} multa${dados.total !== 1 ? 's' : ''}</p>
-      <p>R$ ${dados.valor.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</p>
-      <p>💰 Desconto colaborador: ${dados.comDesconto}/${dados.total}</p>
-      <p>📝 Indicação feita: ${dados.comIndicacao}/${dados.total}</p>
-    </div>
   `).join('');
 }
 
