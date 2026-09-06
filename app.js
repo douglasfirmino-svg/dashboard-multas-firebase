@@ -18,42 +18,6 @@ let multasFiltradas = [];
 let CLOUDINARY_CLOUD_NAME = '';
 let CLOUDINARY_UPLOAD_PRESET = '';
 
-// ============================================
-// CONFIGURAÇÃO EMAILJS
-// ============================================
-let EMAILJS_SERVICE_ID = '';
-let EMAILJS_TEMPLATE_ID = '';
-let EMAILJS_PUBLIC_KEY = '';
-
-function aguardarENV() {
-  return new Promise((resolve) => {
-    const checar = () => {
-      if (window.ENV && window.ENV.VITE_EMAILJS_PUBLIC_KEY) {
-        resolve();
-      } else {
-        setTimeout(checar, 100);
-      }
-    };
-    checar();
-  });
-}
-
-async function inicializarEmailJS() {
-  await aguardarENV();
-
-  if (typeof emailjs !== 'undefined' && window.ENV) {
-    EMAILJS_PUBLIC_KEY = window.ENV.VITE_EMAILJS_PUBLIC_KEY || '';
-    EMAILJS_SERVICE_ID = window.ENV.VITE_EMAILJS_SERVICE_ID || '';
-    EMAILJS_TEMPLATE_ID = window.ENV.VITE_EMAILJS_TEMPLATE_ID || '';
-
-    if (EMAILJS_PUBLIC_KEY) {
-      emailjs.init(EMAILJS_PUBLIC_KEY);
-      console.log('✅ EmailJS inicializado');
-    } else {
-      console.log('⚠️ EmailJS public key não configurada');
-    }
-  }
-}
 
 function aguardarCloudinaryConfig() {
   return new Promise((resolve) => {
@@ -744,43 +708,6 @@ function formatarDataBR(dataISO) {
   return `${dia}/${mes}/${ano}`;
 }
 
-// ============================================
-// ENVIAR TERMO POR EMAIL (EmailJS)
-// ============================================
-async function enviarTermoPorEmail(dadosMulta, emailSupervisor) {
-  if (!EMAILJS_PUBLIC_KEY || !EMAILJS_SERVICE_ID || !EMAILJS_TEMPLATE_ID) {
-    console.log('⚠️ EmailJS não está configurado. Email não será enviado.');
-    return;
-  }
-
-  if (!emailSupervisor || !emailSupervisor.includes('@')) {
-    console.log('⚠️ Email do supervisor inválido. Email não será enviado.');
-    return;
-  }
-
-  try {
-    const params = {
-      to_email: emailSupervisor,
-      ait: dadosMulta['Ait'],
-      placa: dadosMulta['Placa'],
-      condutor: dadosMulta['Condutor'],
-      valor: dadosMulta['Valor'],
-      data_infracao: dadosMulta['Data infração'],
-      descricao: dadosMulta['Descrição infração'],
-      cidade: dadosMulta['Cidade'],
-      tipo_veiculo: dadosMulta['Tipo de Veículo'],
-      locadora: dadosMulta['Locadora'] || '(não informada)',
-      termo_url: dadosMulta['Termo URL'] || '(não anexado)',
-      status: dadosMulta['Status'],
-      centro_custo: dadosMulta['Centro de custo']
-    };
-
-    const resposta = await emailjs.send(EMAILJS_SERVICE_ID, EMAILJS_TEMPLATE_ID, params);
-    console.log('✅ Email enviado ao supervisor:', resposta);
-  } catch (error) {
-    console.error('❌ Erro ao enviar email:', error);
-  }
-}
 
 async function salvarNovaMulta(evento) {
   evento.preventDefault();
@@ -791,16 +718,9 @@ async function salvarNovaMulta(evento) {
   const ait = document.getElementById('f_ait').value.trim();
   const placa = document.getElementById('f_placa').value.trim().toUpperCase();
   const valor = parseFloat(document.getElementById('f_valor').value);
-  const emailSupervisor = document.getElementById('f_emailSupervisor').value.trim();
 
   if (!ait || !placa || isNaN(valor)) {
     mensagemEl.textContent = '❌ Preencha AIT, Placa e Valor corretamente.';
-    mensagemEl.className = 'form-mensagem erro';
-    return;
-  }
-
-  if (!emailSupervisor || !emailSupervisor.includes('@')) {
-    mensagemEl.textContent = '❌ Informe um email válido do supervisor.';
     mensagemEl.className = 'form-mensagem erro';
     return;
   }
@@ -853,9 +773,6 @@ async function salvarNovaMulta(evento) {
     const db = await aguardarFirebase();
     await setDoc(doc(db, 'multas', ait), dadosMulta);
 
-    // Enviar email ao supervisor
-    await enviarTermoPorEmail(dadosMulta, emailSupervisor);
-
     const foiEdicao = aitEmEdicao === ait;
     mensagemEl.textContent = foiEdicao
       ? `✅ Multa ${ait} atualizada com sucesso!`
@@ -892,6 +809,5 @@ window.removerTermo = removerTermo;
 // ============================================
 // INICIAR
 // ============================================
-inicializarEmailJS();
 carregarMultas();
 console.log('🚀 App iniciado!');
