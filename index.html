@@ -149,7 +149,7 @@
     <div class="tabs-container">
       <button class="tab-btn active" onclick="mudarAba('overview')">📊 Visão Geral</button>
       <button class="tab-btn" onclick="mudarAba('por-cidade')">🏙️ Por Centro de Custo</button>
-      <button class="tab-btn" onclick="mudarAba('por-status')">📌 Por Status</button>
+      <button class="tab-btn" onclick="mudarAba('por-status')">📊 Analytics</button>
       <button class="tab-btn" onclick="mudarAba('detalhes')">📋 Detalhes</button>
       <button class="tab-btn" onclick="mudarAba('nova-multa')">➕ Nova Multa</button>
     </div>
@@ -285,8 +285,36 @@
 
     <div id="aba-por-status" class="tab-content">
       <section class="status-section">
-        <h2>📌 Análise por Status</h2>
+        <h2>📊 Analytics</h2>
+
+        <div class="kpi-cards" id="analyticsKpiCards">
+          <div class="loading">⏳ Carregando...</div>
+        </div>
+
+        <h3 style="margin: 30px 0 15px;">🏆 Ranking de Condutores</h3>
+        <div class="table-wrapper">
+          <table class="details-table">
+            <thead>
+              <tr>
+                <th>Condutor</th>
+                <th>Qtd. Multas</th>
+                <th>Valor Total</th>
+                <th>Status Predominante</th>
+              </tr>
+            </thead>
+            <tbody id="tabelaRankingCondutores">
+              <tr><td colspan="4" style="text-align: center; padding: 30px;">⏳ Carregando...</td></tr>
+            </tbody>
+          </table>
+        </div>
+
+        <h3 style="margin: 30px 0 15px;">📌 Distribuição por Status</h3>
         <div class="status-cards" id="statusCards">
+          <div class="loading">⏳ Carregando...</div>
+        </div>
+
+        <h3 style="margin: 30px 0 15px;">🏙️ Cidades com Mais Multas</h3>
+        <div class="status-cards" id="cidadesCards">
           <div class="loading">⏳ Carregando...</div>
         </div>
       </section>

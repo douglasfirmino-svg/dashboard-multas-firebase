@@ -147,6 +147,9 @@ function atualizarDashboard() {
   atualizarGraficos();
   atualizarTabelaCentroCusto();
   atualizarStatusCards();
+  atualizarAnalyticsKPIs();
+  atualizarRankingCondutores();
+  atualizarCidadesCards();
 }
 
 function atualizarTabelaCentroCusto() {
@@ -198,6 +201,124 @@ function atualizarStatusCards() {
       <p>R$ ${dados.valor.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</p>
       <p>💰 Desconto colaborador: ${dados.comDesconto}/${dados.total}</p>
       <p>📝 Indicação feita: ${dados.comIndicacao}/${dados.total}</p>
+    </div>
+  `).join('');
+}
+
+function atualizarAnalyticsKPIs() {
+  const container = document.getElementById('analyticsKpiCards');
+  if (!container) return;
+
+  if (multasFiltradas.length === 0) {
+    container.innerHTML = `<div class="loading">📭 Nenhuma multa registrada</div>`;
+    return;
+  }
+
+  const total = multasFiltradas.length;
+  const valorTotal = multasFiltradas.reduce((soma, m) => soma + (Number(m['Valor']) || 0), 0);
+  const ticketMedio = valorTotal / total;
+
+  const maiorMulta = multasFiltradas.reduce((maior, m) =>
+    (Number(m['Valor']) || 0) > (Number(maior['Valor']) || 0) ? m : maior
+  , multasFiltradas[0]);
+
+  const condutoresUnicos = new Set(multasFiltradas.map(m => m['Condutor']).filter(Boolean)).size;
+
+  const maisRecente = multasFiltradas.reduce((recente, m) => {
+    const dataStr = m['Data infração'];
+    if (!dataStr) return recente;
+    const [dia, mes, ano] = dataStr.split('/').map(Number);
+    const data = new Date(ano, mes - 1, dia);
+
+    if (!recente) return m;
+    const [diaR, mesR, anoR] = recente['Data infração'].split('/').map(Number);
+    const dataR = new Date(anoR, mesR - 1, diaR);
+    return data > dataR ? m : recente;
+  }, null);
+
+  container.innerHTML = `
+    <div class="kpi-card">
+      <div class="kpi-label">Ticket Médio</div>
+      <div class="kpi-value">R$ ${ticketMedio.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</div>
+    </div>
+    <div class="kpi-card danger">
+      <div class="kpi-label">Maior Multa</div>
+      <div class="kpi-value">R$ ${(Number(maiorMulta['Valor']) || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</div>
+    </div>
+    <div class="kpi-card">
+      <div class="kpi-label">Condutores Únicos</div>
+      <div class="kpi-value">${condutoresUnicos}</div>
+    </div>
+    <div class="kpi-card success">
+      <div class="kpi-label">Multa Mais Recente</div>
+      <div class="kpi-value" style="font-size: 22px;">${maisRecente ? maisRecente['Data infração'] : '-'}</div>
+    </div>
+  `;
+}
+
+function atualizarRankingCondutores() {
+  const corpo = document.getElementById('tabelaRankingCondutores');
+  if (!corpo) return;
+
+  if (multasFiltradas.length === 0) {
+    corpo.innerHTML = `<tr><td colspan="4" style="text-align:center; padding:30px;">📭 Nenhuma multa registrada</td></tr>`;
+    return;
+  }
+
+  const porCondutor = {};
+  multasFiltradas.forEach(m => {
+    const condutor = m['Condutor'] || 'Não informado';
+    if (!porCondutor[condutor]) porCondutor[condutor] = { total: 0, valor: 0, status: {} };
+    porCondutor[condutor].total += 1;
+    porCondutor[condutor].valor += Number(m['Valor']) || 0;
+    const status = m['Status'] || 'Pendente';
+    porCondutor[condutor].status[status] = (porCondutor[condutor].status[status] || 0) + 1;
+  });
+
+  const ranking = Object.entries(porCondutor)
+    .map(([condutor, dados]) => {
+      const statusPredominante = Object.entries(dados.status).sort((a, b) => b[1] - a[1])[0][0];
+      return { condutor, ...dados, statusPredominante };
+    })
+    .sort((a, b) => b.total - a.total)
+    .slice(0, 20);
+
+  corpo.innerHTML = ranking.map(r => `
+    <tr>
+      <td>${r.condutor}</td>
+      <td>${r.total}</td>
+      <td>R$ ${r.valor.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</td>
+      <td>${r.statusPredominante}</td>
+    </tr>
+  `).join('');
+}
+
+function atualizarCidadesCards() {
+  const container = document.getElementById('cidadesCards');
+  if (!container) return;
+
+  if (multasFiltradas.length === 0) {
+    container.innerHTML = `<div class="loading">📭 Nenhuma multa registrada</div>`;
+    return;
+  }
+
+  const porCidade = {};
+  multasFiltradas.forEach(m => {
+    const cidade = m['Cidade'] || 'Não informado';
+    if (!porCidade[cidade]) porCidade[cidade] = { total: 0, valor: 0 };
+    porCidade[cidade].total += 1;
+    porCidade[cidade].valor += Number(m['Valor']) || 0;
+  });
+
+  const top5 = Object.entries(porCidade)
+    .sort((a, b) => b[1].total - a[1].total)
+    .slice(0, 5);
+
+  container.innerHTML = top5.map(([cidade, dados]) => `
+    <div class="city-card">
+      <h4>${cidade}</h4>
+      <div class="number">${dados.total}</div>
+      <div class="subtitle">R$ ${dados.valor.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</div>
     </div>
   `).join('');
 }
