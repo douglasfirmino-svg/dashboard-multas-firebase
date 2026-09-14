@@ -897,6 +897,216 @@ window.limparFormulario = limparFormulario;
 window.removerTermo = removerTermo;
 
 // ============================================
+// IMPORTAÇÃO EM LOTE VIA EXCEL
+// ============================================
+
+// Colunas do modelo, na ordem em que aparecem na planilha
+const COLUNAS_MODELO = [
+  'Placa', 'Ait', 'Centro de custo', 'Data infração',
+  'Codigo infração', 'Descrição infração', 'Valor', 'Condutor', 'Matrícula'
+];
+
+function baixarModeloExcel() {
+  const linhaExemplo = {
+    'Placa': 'RIA5H47',
+    'Ait': 'V080032678',
+    'Centro de custo': 'ENEL CE AGENTE COMERCIAL',
+    'Data infração': '26/08/2026',
+    'Codigo infração': '7455',
+    'Descrição infração': 'TRANSITAR EM VELOCIDADE SUPERIOR A MAXIMA PERMITIDA EM ATE 20%',
+    'Valor': 130.16,
+    'Condutor': 'LUIZ CLAUDIO SOARES BENTO',
+    'Matrícula': '7719'
+  };
+
+  const planilha = XLSX.utils.json_to_sheet([linhaExemplo], { header: COLUNAS_MODELO });
+  planilha['!cols'] = COLUNAS_MODELO.map(() => ({ wch: 22 }));
+
+  const livro = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(livro, planilha, 'Multas');
+  XLSX.writeFile(livro, 'modelo_importacao_multas.xlsx');
+}
+
+let linhasParaImportar = []; // linhas válidas, prontas para gravar
+let aitsExistentesSet = new Set(); // cache dos AITs já cadastrados
+
+function normalizarLinhaExcel(linhaBruta) {
+  // Aceita tanto números quanto texto vindos do Excel, e normaliza espaços
+  const pegar = (chave) => {
+    const valor = linhaBruta[chave];
+    if (valor === undefined || valor === null) return '';
+    return String(valor).trim();
+  };
+
+  return {
+    'Placa': pegar('Placa').toUpperCase(),
+    'Ait': pegar('Ait'),
+    'Centro de custo': pegar('Centro de custo'),
+    'Data infração': pegar('Data infração'),
+    'Codigo infração': pegar('Codigo infração'),
+    'Descrição infração': pegar('Descrição infração'),
+    'Valor': parseFloat(String(linhaBruta['Valor']).toString().replace(',', '.')) || 0,
+    'Condutor': pegar('Condutor').toUpperCase(),
+    'Matrícula': pegar('Matrícula')
+  };
+}
+
+function validarLinhaExcel(linha) {
+  const erros = [];
+  if (!linha['Ait']) erros.push('AIT vazio');
+  if (!linha['Placa']) erros.push('Placa vazia');
+  if (!linha['Valor'] || linha['Valor'] <= 0) erros.push('Valor inválido');
+  if (linha['Data infração'] && !/^\d{2}\/\d{2}\/\d{4}$/.test(linha['Data infração'])) {
+    erros.push('Data fora do formato DD/MM/AAAA');
+  }
+  return erros;
+}
+
+async function processarArquivoExcel(arquivo) {
+  const mensagemEl = document.getElementById('importarMensagem');
+  const previaEl = document.getElementById('previaImportacao');
+  mensagemEl.textContent = '';
+  previaEl.innerHTML = '⏳ Lendo arquivo...';
+
+  try {
+    const bufferArquivo = await arquivo.arrayBuffer();
+    const livro = XLSX.read(bufferArquivo, { type: 'array' });
+    const primeiraAba = livro.SheetNames[0];
+    const linhasBrutas = XLSX.utils.sheet_to_json(livro.Sheets[primeiraAba], { defval: '' });
+
+    if (linhasBrutas.length === 0) {
+      previaEl.innerHTML = '';
+      mensagemEl.textContent = '❌ A planilha está vazia.';
+      mensagemEl.className = 'form-mensagem erro';
+      return;
+    }
+
+    // Carrega os AITs já existentes no Firestore para checar duplicados
+    const db = await aguardarFirebase();
+    aitsExistentesSet = new Set(todasMultas.map(m => m['Ait']));
+
+    linhasParaImportar = [];
+    let contadorOk = 0, contadorDuplicada = 0, contadorErro = 0;
+
+    const linhasHtml = linhasBrutas.map((linhaBruta) => {
+      const linha = normalizarLinhaExcel(linhaBruta);
+      const erros = validarLinhaExcel(linha);
+      const duplicada = !erros.length && aitsExistentesSet.has(linha['Ait']);
+
+      let classe = 'linha-ok';
+      let statusTexto = '✅ Pronta';
+
+      if (erros.length > 0) {
+        classe = 'linha-erro';
+        statusTexto = `❌ ${erros.join(', ')}`;
+        contadorErro++;
+      } else if (duplicada) {
+        classe = 'linha-duplicada';
+        statusTexto = '⚠️ AIT já existe (será ignorada)';
+        contadorDuplicada++;
+      } else {
+        contadorOk++;
+        linhasParaImportar.push(linha);
+      }
+
+      return `
+        <tr class="${classe}">
+          <td>${linha['Ait'] || '-'}</td>
+          <td>${linha['Placa'] || '-'}</td>
+          <td>${linha['Centro de custo'] || '-'}</td>
+          <td>${linha['Data infração'] || '-'}</td>
+          <td>R$ ${(linha['Valor'] || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</td>
+          <td>${linha['Condutor'] || '-'}</td>
+          <td>${statusTexto}</td>
+        </tr>
+      `;
+    }).join('');
+
+    previaEl.innerHTML = `
+      <div class="previa-resumo">
+        <span class="ok">✅ ${contadorOk} pronta(s) para importar</span>
+        <span class="duplicada">⚠️ ${contadorDuplicada} duplicada(s) (serão ignoradas)</span>
+        <span class="erro">❌ ${contadorErro} com erro (não serão importadas)</span>
+      </div>
+      <div class="table-wrapper">
+        <table class="previa-tabela">
+          <thead>
+            <tr>
+              <th>Ait</th><th>Placa</th><th>Centro de Custo</th><th>Data</th>
+              <th>Valor</th><th>Condutor</th><th>Situação</th>
+            </tr>
+          </thead>
+          <tbody>${linhasHtml}</tbody>
+        </table>
+      </div>
+      <button type="button" class="btn-confirmar-importacao" onclick="confirmarImportacaoExcel()" ${contadorOk === 0 ? 'disabled' : ''}>
+        💾 Importar ${contadorOk} multa(s)
+      </button>
+    `;
+  } catch (error) {
+    console.error('❌ Erro ao processar Excel:', error);
+    previaEl.innerHTML = '';
+    mensagemEl.textContent = '❌ Erro ao ler o arquivo. Confira se é um .xlsx válido.';
+    mensagemEl.className = 'form-mensagem erro';
+  }
+}
+
+async function confirmarImportacaoExcel() {
+  const mensagemEl = document.getElementById('importarMensagem');
+  const botao = document.querySelector('.btn-confirmar-importacao');
+
+  if (linhasParaImportar.length === 0) return;
+
+  botao.disabled = true;
+  botao.textContent = '💾 Importando...';
+
+  try {
+    const db = await aguardarFirebase();
+    let sucesso = 0;
+
+    for (const linha of linhasParaImportar) {
+      const dadosMulta = {
+        'Ait': linha['Ait'],
+        'Placa': linha['Placa'],
+        'Centro de custo': linha['Centro de custo'],
+        'Data infração': linha['Data infração'],
+        'Codigo infração': linha['Codigo infração'],
+        'Descrição infração': linha['Descrição infração'],
+        'Valor': linha['Valor'],
+        'Condutor': linha['Condutor'],
+        'Matrícula': linha['Matrícula'],
+        'Status': 'Pendente'
+      };
+      await setDoc(doc(db, 'multas', linha['Ait']), dadosMulta);
+      sucesso++;
+    }
+
+    mensagemEl.textContent = `✅ ${sucesso} multa(s) importada(s) com sucesso!`;
+    mensagemEl.className = 'form-mensagem sucesso';
+    document.getElementById('previaImportacao').innerHTML = '';
+    document.getElementById('arquivoExcel').value = '';
+    linhasParaImportar = [];
+  } catch (error) {
+    console.error('❌ Erro ao importar multas:', error);
+    mensagemEl.textContent = '❌ Erro ao importar. Veja o console para detalhes.';
+    mensagemEl.className = 'form-mensagem erro';
+    botao.disabled = false;
+    botao.textContent = `💾 Importar ${linhasParaImportar.length} multa(s)`;
+  }
+}
+
+const inputArquivoExcel = document.getElementById('arquivoExcel');
+if (inputArquivoExcel) {
+  inputArquivoExcel.addEventListener('change', (evento) => {
+    const arquivo = evento.target.files[0];
+    if (arquivo) processarArquivoExcel(arquivo);
+  });
+}
+
+window.baixarModeloExcel = baixarModeloExcel;
+window.confirmarImportacaoExcel = confirmarImportacaoExcel;
+
+// ============================================
 // INICIAR
 // ============================================
 carregarMultas();
