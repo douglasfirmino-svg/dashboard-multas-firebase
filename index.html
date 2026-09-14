@@ -12,6 +12,9 @@
   <!-- Chart.js -->
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2.2.0/dist/chartjs-plugin-datalabels.min.js"></script>
+
+  <!-- SheetJS (leitura/geração de Excel) -->
+  <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
   
   <!-- CSS -->
   <link rel="stylesheet" href="styles.css">
@@ -123,6 +126,46 @@
       cursor: pointer;
     }
     .btn-remover-termo:hover { background: #fecaca; }
+    .previa-tabela {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 16px 0;
+      font-size: 0.85em;
+    }
+    .previa-tabela th, .previa-tabela td {
+      border: 1px solid #e2e8f0;
+      padding: 6px 10px;
+      text-align: left;
+    }
+    .previa-tabela th { background: #f1f5f9; }
+    .previa-tabela tr.linha-erro { background: #fef2f2; }
+    .previa-tabela tr.linha-duplicada { background: #fffbeb; }
+    .previa-resumo {
+      display: flex;
+      gap: 16px;
+      margin: 16px 0;
+      flex-wrap: wrap;
+    }
+    .previa-resumo span {
+      padding: 6px 14px;
+      border-radius: 8px;
+      font-weight: 600;
+      font-size: 0.9em;
+    }
+    .previa-resumo .ok { background: #dcfce7; color: #16a34a; }
+    .previa-resumo .duplicada { background: #fef3c7; color: #b45309; }
+    .previa-resumo .erro { background: #fee2e2; color: #dc2626; }
+    .btn-confirmar-importacao {
+      background: linear-gradient(135deg, #1e3a5f, #2d6a4f);
+      color: white;
+      border: none;
+      padding: 12px 28px;
+      border-radius: 8px;
+      font-weight: 600;
+      cursor: pointer;
+      margin-top: 10px;
+    }
+    .btn-confirmar-importacao:disabled { opacity: 0.6; cursor: not-allowed; }
     @media (max-width: 640px) {
       .form-grid { grid-template-columns: 1fr; }
     }
@@ -152,6 +195,7 @@
       <button class="tab-btn" onclick="mudarAba('por-status')">📊 Analytics</button>
       <button class="tab-btn" onclick="mudarAba('detalhes')">📋 Detalhes</button>
       <button class="tab-btn" onclick="mudarAba('nova-multa')">➕ Nova Multa</button>
+      <button class="tab-btn" onclick="mudarAba('importar')">📥 Importar Excel</button>
     </div>
 
     <div id="aba-overview" class="tab-content active">
@@ -449,6 +493,26 @@
           <div id="formMensagem" class="form-mensagem"></div>
           <button type="submit" class="btn-salvar">💾 Salvar Multa</button>
         </form>
+      </section>
+    </div>
+
+    <div id="aba-importar" class="tab-content">
+      <section class="form-section">
+        <h2>📥 Importar Multas via Excel</h2>
+
+        <div class="busca-ait">
+          <p style="margin: 0 0 10px;">1. Baixe o modelo, preencha as multas no Excel, e depois envie o arquivo aqui.</p>
+          <button type="button" class="btn-buscar" onclick="baixarModeloExcel()">📄 Baixar Modelo</button>
+        </div>
+
+        <div class="form-group full-width" style="margin-bottom: 20px;">
+          <label for="arquivoExcel">2. Selecione o arquivo Excel preenchido (.xlsx)</label>
+          <input type="file" id="arquivoExcel" accept=".xlsx,.xls">
+        </div>
+
+        <div id="previaImportacao"></div>
+
+        <div id="importarMensagem" class="form-mensagem"></div>
       </section>
     </div>
 
